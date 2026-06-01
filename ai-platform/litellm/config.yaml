@@ -3,14 +3,6 @@ general_settings:
   database_url: os.environ/DATABASE_URL
   store_model_in_db: true
 
-  # Cache con Redis
-  cache: true
-  cache_params:
-    type: redis
-    host: redis
-    port: 6379
-
-  # Límites globales de seguridad
   max_budget: null
   budget_duration: null
 
@@ -21,16 +13,22 @@ router_settings:
   retry_after: 5
 
 litellm_settings:
-  # Reintentos ante fallos transitorios
   num_retries: 2
   request_timeout: 120
 
   # Callbacks de observabilidad (Prometheus)
-  success_callback: ["prometheus"]
-  failure_callback: ["prometheus"]
+  # "prometheus_system" es el identificador correcto en LiteLLM >= v1.35
+  success_callback: ["prometheus_system"]
+  failure_callback: ["prometheus_system"]
 
-  # Drop parámetros no soportados por vLLM
   drop_params: true
+
+  # Cache con Redis
+  cache: true
+  cache_params:
+    cache_type: redis
+    host: redis
+    port: 6379
 
 model_list:
 
@@ -67,30 +65,21 @@ model_list:
       description: "Modelo de razonamiento para análisis, planificación y rúbricas"
       max_tokens: 32768
 
-  - model_name: edu-pro
-    litellm_params:
-      model: openai/edu-pro
-      api_base: http://edu-pro:8000/v1
-      api_key: none
-      timeout: 300
-      max_retries: 1
-    model_info:
-      description: "Modelo premium bajo demanda, tareas complejas"
-      max_tokens: 32768
-
-  - model_name: edu-embed
-    litellm_params:
-      model: openai/edu-embed
-      api_base: http://edu-embed:8000/v1
-      api_key: none
-      timeout: 30
-    model_info:
-      description: "Embeddings para RAG y búsqueda semántica"
+# ─── Modelos opcionales (gestionar vía API de LiteLLM cuando el contenedor esté activo) ─
+#
+# edu-pro y edu-embed NO se incluyen aquí porque sus contenedores son opcionales:
+#   - edu-pro: perfil "premium" en docker-compose, levantar con start-premium-model.sh
+#   - edu-embed: agregar servicio edu-embed a docker-compose antes de habilitar
+#
+# Para agregarlos en caliente sin reiniciar LiteLLM:
+#   POST /model/new  -H "Authorization: Bearer $LITELLM_MASTER_KEY"
+#   { "model_name": "edu-pro", "litellm_params": { "model": "openai/edu-pro",
+#     "api_base": "http://edu-pro:8000/v1", "api_key": "none" } }
 
 # ─── Rate limits por defecto (ajustar en cada API Key si se requiere) ─────────
 # Se configuran desde el panel de administración de LiteLLM o via API.
 #
-# edu-fast:    abierto
-# edu-main:    rpm=60, tpm=100000
-# edu-reasoner: rpm=20, tpm=80000
-# edu-pro:     acceso restringido por API Key
+# edu-fast      -> abierto
+# edu-main      -> rpm=60, tpm=100000
+# edu-reasoner  -> rpm=20, tpm=80000
+# edu-pro       -> acceso restringido por API Key (solo cuando esté activo)

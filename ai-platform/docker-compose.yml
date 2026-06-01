@@ -48,7 +48,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - ai-internal
     restart: unless-stopped
@@ -81,6 +81,11 @@ services:
     networks:
       - ai-internal
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ─── Modelo rápido (edu-fast) ─────────────────────────────────────────────
   edu-fast:
@@ -88,6 +93,12 @@ services:
     container_name: edu-fast
     runtime: nvidia
     ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -108,7 +119,7 @@ services:
     expose:
       - "8000"
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     networks:
       - ai-internal
     restart: unless-stopped
@@ -119,6 +130,12 @@ services:
     container_name: edu-main
     runtime: nvidia
     ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -141,7 +158,7 @@ services:
     expose:
       - "8000"
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     networks:
       - ai-internal
     restart: unless-stopped
@@ -152,6 +169,12 @@ services:
     container_name: edu-reasoner
     runtime: nvidia
     ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -172,7 +195,7 @@ services:
     expose:
       - "8000"
     ports:
-      - "8003:8000"
+      - "127.0.0.1:8003:8000"
     networks:
       - ai-internal
     restart: unless-stopped
@@ -183,6 +206,12 @@ services:
     container_name: edu-pro
     runtime: nvidia
     ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -205,7 +234,7 @@ services:
     expose:
       - "8000"
     ports:
-      - "8004:8000"
+      - "127.0.0.1:8004:8000"
     networks:
       - ai-internal
     profiles:
@@ -265,7 +294,7 @@ services:
     restart: unless-stopped
 
   dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.6-3.4.2-ubuntu22.04
+    image: nvcr.io/nvidia/dcgm-exporter:3.3.6-3.4.2-ubuntu22.04
     container_name: dcgm-exporter
     runtime: nvidia
     environment:
