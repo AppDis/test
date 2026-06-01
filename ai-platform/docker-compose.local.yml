@@ -1,0 +1,109 @@
+version: "3.9"
+
+# ─── Simulación local para Mac OS (A2251 Intel, sin GPU NVIDIA) ──────────────
+#
+# Uso:
+#   cp .env.local.example .env.local
+#   docker compose -f docker-compose.local.yml --env-file .env.local up -d
+#
+# Acceso:
+#   API:   http://localhost:4000/v1/chat/completions
+#   Panel: http://localhost:4000  (Bearer $LITELLM_MASTER_KEY)
+#
+# Nota: el primer arranque descarga el modelo (~2 GB). Necesita internet.
+# El modelo llama3.2:3b corre en CPU — esperar ~60 s para la primera respuesta.
+
+networks:
+  ups-local:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+services:
+
+  # ─── Ollama (backend de inferencia, CPU-only en Docker/Mac) ──────────────
+  ollama:
+    image: ollama/ollama
+    container_name: ups-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - ups-local
+    restart: unless-stopped
+    # Levanta el servidor y descarga el modelo en primer arranque
+    entrypoint: ["/bin/sh", "-c",
+      "ollama serve & sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
+    healthcheck:
+      # Verifica que el modelo ya fue descargado y responde
+      test: ["CMD-SHELL",
+        "curl -sf http://localhost:11434/api/tags | grep -q '${OLLAMA_MODEL:-llama3.2}'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
+
+  # ─── LiteLLM Gateway ──────────────────────────────────────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ups-litellm-local
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.local.yaml:/app/config.yaml:ro
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-local_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-dev-key}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:-local-salt-key}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      STORE_MODEL_IN_DB: "True"
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - ups-local
+    restart: unless-stopped
+
+  # ─── Base de datos ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ups-postgres-local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_password}
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ups-local
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-litellm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Cache ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ups-redis-local
+    volumes:
+      - redis_data:/data
+    networks:
+      - ups-local
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

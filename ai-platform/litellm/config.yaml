@@ -15,15 +15,11 @@ router_settings:
 litellm_settings:
   num_retries: 2
   request_timeout: 120
+  drop_params: true
 
-  # Callbacks de observabilidad (Prometheus)
-  # "prometheus_system" es el identificador correcto en LiteLLM >= v1.35
   success_callback: ["prometheus_system"]
   failure_callback: ["prometheus_system"]
 
-  drop_params: true
-
-  # Cache con Redis
   cache: true
   cache_params:
     cache_type: redis
@@ -32,10 +28,10 @@ litellm_settings:
 
 model_list:
 
-  - model_name: edu-fast
+  - model_name: ups-fast
     litellm_params:
-      model: openai/edu-fast
-      api_base: http://edu-fast:8000/v1
+      model: openai/ups-fast
+      api_base: http://ups-fast:8000/v1
       api_key: none
       timeout: 60
       max_retries: 2
@@ -43,10 +39,10 @@ model_list:
       description: "Modelo rápido para consultas simples y baja latencia"
       max_tokens: 32768
 
-  - model_name: edu-main
+  - model_name: ups-main
     litellm_params:
-      model: openai/edu-main
-      api_base: http://edu-main:8000/v1
+      model: openai/ups-main
+      api_base: http://ups-main:8000/v1
       api_key: none
       timeout: 120
       max_retries: 2
@@ -54,10 +50,10 @@ model_list:
       description: "Asistente académico general, programación, Sistemas Distribuidos"
       max_tokens: 32768
 
-  - model_name: edu-reasoner
+  - model_name: ups-reasoner
     litellm_params:
-      model: openai/edu-reasoner
-      api_base: http://edu-reasoner:8000/v1
+      model: openai/ups-reasoner
+      api_base: http://ups-reasoner:8000/v1
       api_key: none
       timeout: 180
       max_retries: 1
@@ -65,21 +61,5 @@ model_list:
       description: "Modelo de razonamiento para análisis, planificación y rúbricas"
       max_tokens: 32768
 
-# ─── Modelos opcionales (gestionar vía API de LiteLLM cuando el contenedor esté activo) ─
-#
-# edu-pro y edu-embed NO se incluyen aquí porque sus contenedores son opcionales:
-#   - edu-pro: perfil "premium" en docker-compose, levantar con start-premium-model.sh
-#   - edu-embed: agregar servicio edu-embed a docker-compose antes de habilitar
-#
-# Para agregarlos en caliente sin reiniciar LiteLLM:
-#   POST /model/new  -H "Authorization: Bearer $LITELLM_MASTER_KEY"
-#   { "model_name": "edu-pro", "litellm_params": { "model": "openai/edu-pro",
-#     "api_base": "http://edu-pro:8000/v1", "api_key": "none" } }
-
-# ─── Rate limits por defecto (ajustar en cada API Key si se requiere) ─────────
-# Se configuran desde el panel de administración de LiteLLM o via API.
-#
-# edu-fast      -> abierto
-# edu-main      -> rpm=60, tpm=100000
-# edu-reasoner  -> rpm=20, tpm=80000
-# edu-pro       -> acceso restringido por API Key (solo cuando esté activo)
+# ups-pro y ups-embed se registran vía API cuando sus contenedores están activos.
+# Ver scripts/start-premium-model.sh para ups-pro.

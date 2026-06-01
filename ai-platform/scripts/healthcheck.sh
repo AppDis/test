@@ -7,7 +7,6 @@ set -euo pipefail
 LITELLM_URL="${LITELLM_URL:-http://localhost:4000}"
 MASTER_KEY="${LITELLM_MASTER_KEY:-}"
 
-# Colores solo si stdout es terminal
 if [[ -t 1 ]]; then
   RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 else
@@ -30,7 +29,7 @@ check_container_http() {
   fi
 }
 
-# Chequeo HTTP desde el host (para servicios con ports publicados)
+# Chequeo HTTP desde el host (para servicios con ports: 127.0.0.1:XXXX)
 check_host_http() {
   local url="$1"
   local label="$2"
@@ -42,13 +41,12 @@ check_host_http() {
 }
 
 echo "=============================="
-echo " AI Platform — Health Check"
+echo " UPS AI Platform — Health Check"
 echo "=============================="
 echo ""
 
 echo "[ Contenedores Docker ]"
-for svc in nginx litellm postgres redis edu-fast edu-main edu-reasoner \
-            prometheus grafana alertmanager dcgm-exporter node-exporter cadvisor; do
+for svc in ups-nginx ups-litellm ups-postgres ups-redis ups-fast ups-main ups-reasoner; do
   STATUS=$(docker inspect --format='{{.State.Status}}' "$svc" 2>/dev/null || echo "not found")
   if [[ "$STATUS" == "running" ]]; then
     ok "$svc (running)"
@@ -59,35 +57,28 @@ for svc in nginx litellm postgres redis edu-fast edu-main edu-reasoner \
   fi
 done
 
-EDU_PRO_STATUS=$(docker inspect --format='{{.State.Status}}' "edu-pro" 2>/dev/null || echo "not found")
-if [[ "$EDU_PRO_STATUS" == "running" ]]; then
-  ok "edu-pro (running) [premium activo]"
+UPS_PRO_STATUS=$(docker inspect --format='{{.State.Status}}' "ups-pro" 2>/dev/null || echo "not found")
+if [[ "$UPS_PRO_STATUS" == "running" ]]; then
+  ok "ups-pro (running) [premium activo]"
 else
-  warn "edu-pro ($EDU_PRO_STATUS) [premium detenido — normal]"
+  warn "ups-pro ($UPS_PRO_STATUS) [premium detenido — normal]"
 fi
 
 echo ""
 echo "[ Endpoints HTTP ]"
 
 # LiteLLM: expose-only → usar docker exec
-check_container_http "litellm"      "/health"         "LiteLLM /health"
+check_container_http "ups-litellm" "/health" "LiteLLM /health"
 
-# vLLM: puertos enlazados a 127.0.0.1 → chequear desde host
-check_host_http "http://localhost:8001/v1/models" "edu-fast  /v1/models"
-check_host_http "http://localhost:8002/v1/models" "edu-main  /v1/models"
-check_host_http "http://localhost:8003/v1/models" "edu-reasoner /v1/models"
-
-# Servicios de observabilidad: expose-only → usar docker exec
-check_container_http "prometheus"   "/-/healthy"      "Prometheus"
-check_container_http "grafana"      "/api/health"     "Grafana"
-check_container_http "node-exporter" "/metrics"       "Node Exporter"
-check_container_http "cadvisor"     "/healthz"        "cAdvisor"
-check_container_http "dcgm-exporter" "/metrics"       "DCGM Exporter"
+# vLLM: enlazados a 127.0.0.1 → chequear desde host
+check_host_http "http://localhost:8001/v1/models" "ups-fast  /v1/models"
+check_host_http "http://localhost:8002/v1/models" "ups-main  /v1/models"
+check_host_http "http://localhost:8003/v1/models" "ups-reasoner /v1/models"
 
 echo ""
 echo "[ Modelos disponibles en LiteLLM ]"
 if [[ -n "$MASTER_KEY" ]]; then
-  MODELS=$(docker exec litellm curl -sf --max-time 10 \
+  MODELS=$(docker exec ups-litellm curl -sf --max-time 10 \
     -H "Authorization: Bearer $MASTER_KEY" \
     http://localhost:4000/v1/models 2>/dev/null | jq -r '.data[].id' 2>/dev/null || echo "")
   if [[ -n "$MODELS" ]]; then

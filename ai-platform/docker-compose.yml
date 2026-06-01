@@ -1,21 +1,19 @@
 version: "3.9"
 
 networks:
-  ai-internal:
+  ups-internal:
     driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
-  grafana_data:
-  prometheus_data:
 
 services:
 
   # ─── Reverse Proxy ────────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: ups-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -25,13 +23,13 @@ services:
     depends_on:
       - litellm
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
 
   # ─── LiteLLM Gateway ──────────────────────────────────────────────────────
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
+    container_name: ups-litellm
     expose:
       - "4000"
     volumes:
@@ -50,13 +48,13 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
 
   # ─── Base de datos ────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
+    container_name: ups-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -64,7 +62,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -75,11 +73,11 @@ services:
   # ─── Cache ────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: redis
+    container_name: ups-redis
     volumes:
       - redis_data:/data
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -87,10 +85,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── Modelo rápido (edu-fast) ─────────────────────────────────────────────
-  edu-fast:
+  # ─── Modelo rápido ────────────────────────────────────────────────────────
+  ups-fast:
     image: vllm/vllm-openai:latest
-    container_name: edu-fast
+    container_name: ups-fast
     runtime: nvidia
     ipc: host
     deploy:
@@ -108,7 +106,7 @@ services:
       - "--model"
       - "/models/Qwen2.5-7B-Instruct"
       - "--served-model-name"
-      - "edu-fast"
+      - "ups-fast"
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -121,13 +119,13 @@ services:
     ports:
       - "127.0.0.1:8001:8000"
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
 
-  # ─── Modelo principal (edu-main) ──────────────────────────────────────────
-  edu-main:
+  # ─── Modelo principal ─────────────────────────────────────────────────────
+  ups-main:
     image: vllm/vllm-openai:latest
-    container_name: edu-main
+    container_name: ups-main
     runtime: nvidia
     ipc: host
     deploy:
@@ -145,7 +143,7 @@ services:
       - "--model"
       - "/models/Qwen2.5-32B-Instruct-AWQ"
       - "--served-model-name"
-      - "edu-main"
+      - "ups-main"
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -160,13 +158,13 @@ services:
     ports:
       - "127.0.0.1:8002:8000"
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
 
-  # ─── Modelo razonador (edu-reasoner) ─────────────────────────────────────
-  edu-reasoner:
+  # ─── Modelo razonador ─────────────────────────────────────────────────────
+  ups-reasoner:
     image: vllm/vllm-openai:latest
-    container_name: edu-reasoner
+    container_name: ups-reasoner
     runtime: nvidia
     ipc: host
     deploy:
@@ -184,7 +182,7 @@ services:
       - "--model"
       - "/models/DeepSeek-R1-Distill-Qwen-32B"
       - "--served-model-name"
-      - "edu-reasoner"
+      - "ups-reasoner"
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -197,13 +195,13 @@ services:
     ports:
       - "127.0.0.1:8003:8000"
     networks:
-      - ai-internal
+      - ups-internal
     restart: unless-stopped
 
-  # ─── Modelo premium bajo demanda (edu-pro) ────────────────────────────────
-  edu-pro:
+  # ─── Modelo premium (bajo demanda) ───────────────────────────────────────
+  ups-pro:
     image: vllm/vllm-openai:latest
-    container_name: edu-pro
+    container_name: ups-pro
     runtime: nvidia
     ipc: host
     deploy:
@@ -221,7 +219,7 @@ services:
       - "--model"
       - "/models/Qwen2.5-72B-Instruct-AWQ"
       - "--served-model-name"
-      - "edu-pro"
+      - "ups-pro"
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -236,108 +234,7 @@ services:
     ports:
       - "127.0.0.1:8004:8000"
     networks:
-      - ai-internal
+      - ups-internal
     profiles:
       - premium
-    restart: unless-stopped
-
-  # ─── Observabilidad ───────────────────────────────────────────────────────
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.enable-lifecycle"
-    expose:
-      - "9090"
-    networks:
-      - ai-internal
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: https://${DOMAIN}/grafana
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    expose:
-      - "3000"
-    depends_on:
-      - prometheus
-    networks:
-      - ai-internal
-    restart: unless-stopped
-
-  alertmanager:
-    image: prom/alertmanager:latest
-    container_name: alertmanager
-    volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-    expose:
-      - "9093"
-    networks:
-      - ai-internal
-    restart: unless-stopped
-
-  dcgm-exporter:
-    image: nvcr.io/nvidia/dcgm-exporter:3.3.6-3.4.2-ubuntu22.04
-    container_name: dcgm-exporter
-    runtime: nvidia
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-    cap_add:
-      - SYS_ADMIN
-    expose:
-      - "9400"
-    networks:
-      - ai-internal
-    restart: unless-stopped
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    pid: host
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - "--path.procfs=/host/proc"
-      - "--path.sysfs=/host/sys"
-      - "--path.rootfs=/rootfs"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
-    expose:
-      - "9100"
-    networks:
-      - ai-internal
-    restart: unless-stopped
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    privileged: true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-      - /dev/disk:/dev/disk:ro
-    expose:
-      - "8080"
-    networks:
-      - ai-internal
     restart: unless-stopped
