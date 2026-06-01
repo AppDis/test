@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-LITELLM_URL="${LITELLM_URL:-http://localhost:4000}"
+LITELLM_URL="${LITELLM_URL:-http://localhost:80}"
 MASTER_KEY="${LITELLM_MASTER_KEY:-}"
 
 if [[ -t 1 ]]; then
