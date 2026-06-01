@@ -1,0 +1,115 @@
+groups:
+
+  - name: gpu_alerts
+    rules:
+
+      - alert: GPUMemoryHigh
+        expr: DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU memoria alta ({{ $labels.gpu }})"
+          description: "Uso de memoria GPU supera el 90% durante 5 minutos. Valor actual: {{ $value | printf \"%.1f\" }}%"
+
+      - alert: GPUUtilizationHigh
+        expr: DCGM_FI_DEV_GPU_UTIL > 95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU utilización muy alta ({{ $labels.gpu }})"
+          description: "Utilización de GPU supera el 95% durante 10 minutos. Valor: {{ $value }}%"
+
+      - alert: GPUTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Temperatura GPU crítica ({{ $labels.gpu }})"
+          description: "Temperatura GPU supera 80°C. Valor actual: {{ $value }}°C"
+
+  - name: host_alerts
+    rules:
+
+      - alert: HostRAMHigh
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RAM del sistema alta"
+          description: "Uso de RAM supera el 85%. Valor actual: {{ $value | printf \"%.1f\" }}%"
+
+      - alert: HostDiskHigh
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disco NVMe con poco espacio"
+          description: "Uso de disco supera el 80%. Valor actual: {{ $value | printf \"%.1f\" }}%"
+
+  - name: service_alerts
+    rules:
+
+      - alert: LiteLLMDown
+        expr: up{job="litellm"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LiteLLM no responde"
+          description: "El gateway LiteLLM lleva más de 1 minuto sin responder."
+
+      - alert: PostgreSQLDown
+        expr: up{job="litellm"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL no responde"
+          description: "La base de datos PostgreSQL no está disponible."
+
+      - alert: VLLMModelDown
+        expr: up{job=~"vllm-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Modelo vLLM caído ({{ $labels.job }})"
+          description: "El servicio {{ $labels.job }} lleva más de 2 minutos sin responder."
+
+  - name: api_alerts
+    rules:
+
+      - alert: HighErrorRate5xx
+        expr: |
+          rate(litellm_requests_total{status_code=~"5.."}[5m])
+          /
+          rate(litellm_requests_total[5m]) * 100 > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasa de errores HTTP 5xx alta"
+          description: "Más del 5% de las solicitudes retornan error 5xx. Valor: {{ $value | printf \"%.1f\" }}%"
+
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, rate(litellm_request_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia p95 alta"
+          description: "Latencia p95 supera 30 segundos. Valor actual: {{ $value | printf \"%.1f\" }}s"
+
+      - alert: VLLMQueueLarge
+        expr: vllm:num_requests_waiting > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cola de vLLM congestionada ({{ $labels.job }})"
+          description: "Hay más de 10 solicitudes en cola en {{ $labels.job }}. Valor: {{ $value }}"
