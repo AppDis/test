@@ -66,7 +66,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       STORE_MODEL_IN_DB: "True"
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
     depends_on:
       postgres:
         condition: service_healthy

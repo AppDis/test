@@ -17,9 +17,7 @@ litellm_settings:
   request_timeout: 180
   drop_params: true
 
-  success_callback: ["prometheus_system"]
-  failure_callback: ["prometheus_system"]
-
+  # Sin callbacks de Prometheus en local (no hay servidor Prometheus en este entorno)
   cache: true
   cache_params:
     cache_type: redis
