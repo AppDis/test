@@ -1,7 +1,11 @@
 # Despliegue Fase 1 — UPS AI Platform (Gigabyte)
 
 Guía completa para poner en producción la plataforma desde cero.  
-Sistema objetivo: **Ubuntu 22.04 / 24.04 LTS** con GPU NVIDIA.
+Sistema objetivo: **Ubuntu 24.04.4 LTS** con GPU NVIDIA GB10 (Grace Blackwell).
+
+> **Equipo validado:** NVIDIA GB10 · Driver 580.159.03 · CUDA 13.0 · Memoria unificada CPU+GPU.  
+> La GPU GB10 usa arquitectura de memoria unificada — CPU y GPU comparten el mismo pool de RAM,  
+> lo que permite cargar modelos más grandes que en GPUs discretas convencionales.
 
 ---
 
@@ -15,15 +19,19 @@ lspci | grep -i nvidia
 nvidia-smi
 ```
 
-**Salida esperada de `nvidia-smi`:**
+**Salida esperada en el equipo Gigabyte (GB10):**
 
 ```
 +-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 570.xx     Driver Version: 570.xx    CUDA Version: 12.x                     |
+| NVIDIA-SMI 580.159.03             Driver Version: 580.159.03     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
 | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-|   0  NVIDIA ...                     Off | 00000000:xx:xx.0  Off  |                    0 |
+|   0  NVIDIA GB10                    On  |   0000000F:01:00.0 Off |                  N/A |
+| N/A   34C    P8              4W /  N/A  | Not Supported          |      0%      Default |
 +-----------------------------------------------------------------------------------------+
 ```
+
+> `Memory-Usage: Not Supported` es normal en el GB10 — usa memoria unificada, no VRAM discreta.
 
 Si `nvidia-smi` responde → **saltar al Paso 2**.  
 Si falla → instalar el driver:
@@ -42,8 +50,8 @@ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt update
 
-# Instalar driver (mínimo 550 para CUDA 12.4 que requiere vLLM)
-sudo apt install -y nvidia-driver-570
+# Instalar driver (mínimo 550 para CUDA 12.4+)
+sudo apt install -y nvidia-driver-580
 
 # Reiniciar y verificar
 sudo reboot
