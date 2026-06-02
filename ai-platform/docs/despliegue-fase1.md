@@ -37,8 +37,8 @@ sudo apt install -y build-essential dkms linux-headers-$(uname -r)
 sudo apt purge -y 'nvidia-*' 'libnvidia-*' cuda-drivers 2>/dev/null || true
 sudo apt autoremove -y
 
-# Agregar repositorio oficial NVIDIA
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+# Agregar repositorio oficial NVIDIA (Ubuntu 24.04)
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt update
 
@@ -49,7 +49,7 @@ sudo apt install -y nvidia-driver-570
 sudo reboot
 ```
 
-> Para Ubuntu 24.04 reemplazar `ubuntu2204` por `ubuntu2404` en la URL del keyring.  
+> Si usas Ubuntu 22.04 reemplazar `ubuntu2404` por `ubuntu2204` en la URL del keyring.  
 > Si `nvidia-smi` falla tras el reinicio, verificar que **Secure Boot esté deshabilitado** en la BIOS.
 
 ---
