@@ -140,18 +140,19 @@ sudo systemctl restart docker
 # Runtime nvidia disponible
 docker info | grep -i runtime
 
-# GPU accesible dentro de un contenedor
-docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+# GPU accesible dentro de un contenedor (imagen ARM64 para GB10)
+docker run --rm --gpus all \
+  nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 ```
 
-La segunda salida debe ser idéntica a `nvidia-smi` en el host.
+La salida debe ser idéntica a `nvidia-smi` en el host.
 
-**Verificar que CUDA funciona para vLLM:**
+**Verificar que CUDA funciona para vLLM (imagen ARM64):**
 
 ```bash
 docker run --rm --gpus all --ipc=host \
   -e NVIDIA_VISIBLE_DEVICES=all \
-  vllm/vllm-openai:latest \
+  vllm/vllm-openai:latest-aarch64-cu129-ubuntu2404 \
   python3 -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPUs:', torch.cuda.device_count())"
 ```
 
@@ -192,6 +193,10 @@ Espacio requerido por modelo:
 Total mínimo para los 3 modelos base: **~100 GB libres**.
 
 ### 4.3 Descargar modelos
+
+> **Nota GB10 (memoria unificada):** el GB10 comparte RAM entre CPU y GPU. Con 128 GB de memoria
+> unificada puedes cargar modelos significativamente más grandes que en GPUs discretas convencionales.
+> Los modelos AWQ (cuantizados) son la opción recomendada para maximizar el número de modelos activos.
 
 ```bash
 # Instalar huggingface-cli si no está
