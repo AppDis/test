@@ -17,6 +17,13 @@ litellm_settings:
   request_timeout: 180
   drop_params: true
 
+  # Mismos aliases explícitos que producción → el código de prueba funciona igual en local.
+  # En local todos apuntan a llama3.2:3b (Ollama), en producción cada alias tiene su modelo real.
+  model_alias_map:
+    "ups/qwen2.5-7b":      "ups-fast"
+    "ups/qwen2.5-32b":     "ups-main"
+    "ups/deepseek-r1-32b": "ups-reasoner"
+
   # Sin callbacks de Prometheus en local (no hay servidor Prometheus en este entorno)
   cache: true
   cache_params:

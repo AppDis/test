@@ -17,6 +17,13 @@ litellm_settings:
   request_timeout: 120
   drop_params: true
 
+  # Aliases explícitos: el cliente puede usar ups/qwen2.5-7b o ups-fast indistintamente.
+  # Actualizar aquí si se cambia el modelo sin romper el código existente de los estudiantes.
+  model_alias_map:
+    "ups/qwen2.5-7b":      "ups-fast"
+    "ups/qwen2.5-32b":     "ups-main"
+    "ups/deepseek-r1-32b": "ups-reasoner"
+
   cache: true
   cache_params:
     cache_type: redis
