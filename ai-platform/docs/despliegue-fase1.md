@@ -64,6 +64,14 @@ sudo reboot
 
 ## Paso 2 — Instalar Docker Engine
 
+> **Equipo Gigabyte:** Docker 29.2.1 y Compose v5.0.2 ya estaban instalados — se saltó la instalación.  
+> Verificar si ya está antes de instalar:
+> ```bash
+> docker --version 2>/dev/null && echo "Ya instalado" || echo "No instalado"
+> ```
+
+Si no está instalado:
+
 ```bash
 # Limpiar versiones anteriores
 sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
@@ -95,8 +103,11 @@ sudo apt install -y \
 # Habilitar servicio
 sudo systemctl enable docker
 sudo systemctl start docker
+```
 
-# Agregar usuario al grupo docker (evita usar sudo en cada comando)
+**En cualquier caso — agregar usuario al grupo docker:**
+
+```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
@@ -109,7 +120,7 @@ docker compose version
 docker run --rm hello-world
 ```
 
-Salida esperada al final: `Hello from Docker!`
+Salida esperada (ARM64): mensaje `Hello from Docker!` descargando imagen `arm64v8`.
 
 ---
 
@@ -117,8 +128,14 @@ Salida esperada al final: `Hello from Docker!`
 
 Este componente es el puente entre Docker y el driver NVIDIA del host. Sin él, los contenedores vLLM no pueden acceder a la GPU.
 
+> **Equipo Gigabyte:** nvidia-ctk 1.19.1 ya estaba instalado, pero el runtime NVIDIA **no estaba
+> registrado** en Docker. Siempre ejecutar la configuración aunque el toolkit esté instalado.
+
 ```bash
-# Agregar repositorio NVIDIA Container Toolkit
+# Verificar si ya está instalado
+nvidia-ctk --version 2>/dev/null && echo "Ya instalado" || echo "No instalado"
+
+# Si no está instalado, agregar repositorio e instalar:
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
   | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 
@@ -129,7 +146,7 @@ curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-contai
 sudo apt update
 sudo apt install -y nvidia-container-toolkit
 
-# Configurar runtime NVIDIA en Docker
+# Siempre ejecutar — registra el runtime nvidia en Docker
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
