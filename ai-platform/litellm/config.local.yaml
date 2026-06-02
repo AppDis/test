@@ -45,8 +45,10 @@ model_list:
       timeout: 60
       max_retries: 2
     model_info:
-      description: "Local (CPU) — alias rápido → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — simula Qwen2.5-7B vía Ollama/llama3.2:3b"
       max_tokens: 32768
+      input_cost_per_token: 0.00000004
+      output_cost_per_token: 0.0000001
 
   - model_name: ups-main
     litellm_params:
@@ -56,8 +58,10 @@ model_list:
       timeout: 120
       max_retries: 2
     model_info:
-      description: "Local (CPU) — alias principal → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — simula Qwen2.5-32B vía Ollama/llama3.2:3b"
       max_tokens: 32768
+      input_cost_per_token: 0.00000079
+      output_cost_per_token: 0.00000079
 
   - model_name: ups-reasoner
     litellm_params:
@@ -67,7 +71,9 @@ model_list:
       timeout: 180
       max_retries: 1
     model_info:
-      description: "Local (CPU) — alias razonador → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — simula DeepSeek-R1-32B vía Ollama/llama3.2:3b"
       max_tokens: 32768
+      input_cost_per_token: 0.00000029
+      output_cost_per_token: 0.00000029
 
 # ups-pro se registra dinámicamente con start-premium-model.sh --local

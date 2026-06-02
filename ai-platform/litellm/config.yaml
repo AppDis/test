@@ -40,8 +40,10 @@ model_list:
       timeout: 60
       max_retries: 2
     model_info:
-      description: "Modelo rápido para consultas simples y baja latencia"
+      description: "Qwen2.5-7B-Instruct — consultas simples y baja latencia"
       max_tokens: 32768
+      input_cost_per_token: 0.00000004    # $0.04 / 1M tokens (ref. OpenRouter)
+      output_cost_per_token: 0.0000001    # $0.10 / 1M tokens
 
   - model_name: ups-main
     litellm_params:
@@ -51,8 +53,10 @@ model_list:
       timeout: 120
       max_retries: 2
     model_info:
-      description: "Asistente académico general, programación, Sistemas Distribuidos"
+      description: "Qwen2.5-32B-Instruct-AWQ — asistente académico general, programación"
       max_tokens: 32768
+      input_cost_per_token: 0.00000079    # $0.79 / 1M tokens (ref. OpenRouter)
+      output_cost_per_token: 0.00000079   # $0.79 / 1M tokens
 
   - model_name: ups-reasoner
     litellm_params:
@@ -62,8 +66,10 @@ model_list:
       timeout: 180
       max_retries: 1
     model_info:
-      description: "Modelo de razonamiento para análisis, planificación y rúbricas"
+      description: "DeepSeek-R1-Distill-Qwen-32B — razonamiento, análisis, rúbricas"
       max_tokens: 32768
+      input_cost_per_token: 0.00000029    # $0.29 / 1M tokens (ref. OpenRouter)
+      output_cost_per_token: 0.00000029   # $0.29 / 1M tokens
 
 # ups-pro y ups-embed se registran vía API cuando sus contenedores están activos.
 # Ver scripts/start-premium-model.sh para ups-pro.
