@@ -156,28 +156,23 @@ sudo systemctl restart docker
 ```bash
 # Runtime nvidia disponible
 docker info | grep -i runtime
-
-# GPU accesible dentro de un contenedor (imagen ARM64 para GB10)
-docker run --rm --gpus all \
-  nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
-```
-
-La salida debe ser idéntica a `nvidia-smi` en el host.
-
-**Verificar que CUDA funciona para vLLM (imagen ARM64):**
-
-```bash
-docker run --rm --gpus all --ipc=host \
-  -e NVIDIA_VISIBLE_DEVICES=all \
-  vllm/vllm-openai:latest-aarch64-cu129-ubuntu2404 \
-  python3 -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPUs:', torch.cuda.device_count())"
 ```
 
 Salida esperada:
 ```
-CUDA: True
-GPUs: 1
+Runtimes: io.containerd.runc.v2 nvidia runc
+Default Runtime: runc
 ```
+
+> **Opcional — test de GPU en contenedor** (puede omitirse, la imagen ocupa ~500 MB):
+> ```bash
+> docker run --rm --gpus all \
+>   nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
+> # Eliminar imagen después del test:
+> docker rmi nvidia/cuda:12.6.0-base-ubuntu24.04
+> ```
+> La salida debe ser idéntica a `nvidia-smi` en el host. No es necesaria para el despliegue —
+> los contenedores vLLM traen su propio entorno CUDA.
 
 ---
 
