@@ -36,7 +36,12 @@ if $LOCAL; then
           "api_key": "none",
           "timeout": 300
         },
-        "model_info": {"description": "Local — alias premium → llama3.2:3b vía Ollama"}
+        "model_info": {
+          "description": "Local (CPU) — simula Qwen2.5-72B-AWQ vía Ollama/llama3.2:3b",
+          "max_tokens": 32768,
+          "input_cost_per_token": 0.00000036,
+          "output_cost_per_token": 0.0000004
+        }
       }' > /dev/null && echo "ups-pro registrado en LiteLLM"
   else
     echo "[WARN] LITELLM_MASTER_KEY no definida — registrar ups-pro manualmente en /ui"
@@ -72,6 +77,12 @@ else
           "api_base": "http://ups-pro:8000/v1",
           "api_key": "none",
           "timeout": 300
+        },
+        "model_info": {
+          "description": "Qwen2.5-72B-Instruct-AWQ — modelo premium, máxima capacidad",
+          "max_tokens": 32768,
+          "input_cost_per_token": 0.00000036,
+          "output_cost_per_token": 0.0000004
         }
       }' > /dev/null && echo "ups-pro registrado en LiteLLM"
   fi
