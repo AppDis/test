@@ -187,12 +187,43 @@ git clone https://github.com/AppDis/test.git . -b claude/fase1-ups
 cd ai-platform
 ```
 
-### 4.2 Preparar almacenamiento de modelos
+### 4.2 Preparar almacenamiento
+
+El equipo tiene un NVMe de 4 TB (SAMSUNG MZALC4T0HBL1). Se crea una partición dedicada
+para datos montada en `/data` — separada del sistema operativo, con espacio para modelos
+y otros usos futuros (datasets, backups, notebooks, etc.).
 
 ```bash
+# Corregir tabla GPT para reconocer los 4 TB completos
+sudo parted /dev/nvme0n1 print   # responder "Fix" al aviso
+
+# Crear partición con el espacio libre (desde 512 GB hasta el final)
+sudo parted -a optimal /dev/nvme0n1 mkpart primary ext4 512GB 100%
+
+# Formatear
+sudo mkfs.ext4 /dev/nvme0n1p3
+
+# Montar en /data
+sudo mount /dev/nvme0n1p3 /data
+
+# Auto-montar al reiniciar
+echo "/dev/nvme0n1p3 /data ext4 defaults 0 2" | sudo tee -a /etc/fstab
+
+# Crear carpeta de modelos y dar permisos al usuario
 sudo mkdir -p /data/models
+sudo chown $USER:$USER /data
 sudo chown $USER:$USER /data/models
-df -h /data   # verificar espacio disponible
+```
+
+**Verificar:**
+```bash
+df -h /data
+```
+
+Salida esperada:
+```
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p3  3.3T   28K  3.1T   1% /data
 ```
 
 Espacio requerido por modelo:
@@ -204,7 +235,7 @@ Espacio requerido por modelo:
 | DeepSeek-R1-Distill-Qwen-32B | ~65 GB |
 | Qwen2.5-72B-Instruct-AWQ (ups-pro) | ~40 GB |
 
-Total mínimo para los 3 modelos base: **~100 GB libres**.
+Total mínimo para los 3 modelos base: **~100 GB libres** (disponible: 3.1 TB).
 
 ### 4.3 Descargar modelos
 
