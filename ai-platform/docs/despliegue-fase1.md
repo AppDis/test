@@ -181,8 +181,10 @@ Default Runtime: runc
 ### 4.1 Clonar el repositorio
 
 ```bash
-git clone <URL-DEL-REPOSITORIO> ups-ai
-cd ups-ai/ai-platform
+mkdir -p ~/dgx-workspace
+cd ~/dgx-workspace
+git clone https://github.com/AppDis/test.git . -b claude/fase1-ups
+cd ai-platform
 ```
 
 ### 4.2 Preparar almacenamiento de modelos
