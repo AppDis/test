@@ -4,13 +4,14 @@
 
 set -euo pipefail
 
+command -v jq > /dev/null 2>&1 || { echo "Error: jq no está instalado (apt install jq / brew install jq)"; exit 1; }
+
 LITELLM_URL="${LITELLM_URL:-http://localhost:4000}"
 MASTER_KEY="${LITELLM_MASTER_KEY:?La variable LITELLM_MASTER_KEY no está definida}"
 
 EMAIL="${1:?Uso: $0 <correo@institucion.edu.ec> [modelos]}"
-MODELS="${2:-edu-fast,edu-main,edu-reasoner}"
+MODELS="${2:-ups-fast,ups-main,ups-reasoner}"
 
-# Validar formato de correo institucional básico
 if [[ ! "$EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
   echo "Error: correo inválido: $EMAIL"
   exit 1
@@ -19,7 +20,6 @@ fi
 echo "Creando API Key para: $EMAIL"
 echo "Modelos permitidos: $MODELS"
 
-# Construir array de modelos en JSON
 MODELS_JSON=$(echo "$MODELS" | tr ',' '\n' | jq -Rn '[inputs]')
 
 RESPONSE=$(curl -s -X POST "${LITELLM_URL}/key/generate" \
@@ -27,7 +27,6 @@ RESPONSE=$(curl -s -X POST "${LITELLM_URL}/key/generate" \
   -H "Content-Type: application/json" \
   -d "{
     \"user_id\": \"${EMAIL}\",
-    \"user_email\": \"${EMAIL}\",
     \"models\": ${MODELS_JSON},
     \"metadata\": {
       \"user_email\": \"${EMAIL}\",

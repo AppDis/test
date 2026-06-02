@@ -9,12 +9,12 @@ general_settings:
 router_settings:
   routing_strategy: least-busy
   num_retries: 2
-  timeout: 120
+  timeout: 180
   retry_after: 5
 
 litellm_settings:
   num_retries: 2
-  request_timeout: 120
+  request_timeout: 180
   drop_params: true
 
   success_callback: ["prometheus_system"]
@@ -26,40 +26,43 @@ litellm_settings:
     host: redis
     port: 6379
 
+# Los tres aliases siempre activos apuntan a Ollama (un solo backend CPU).
+# ups-pro se registra vía API al ejecutar start-premium-model.sh --local
+# Mismos alias names que producción → los scripts y pruebas de API son idénticos.
+
 model_list:
 
   - model_name: ups-fast
     litellm_params:
-      model: openai/ups-fast
-      api_base: http://ups-fast:8000/v1
+      model: openai/llama3.2:3b
+      api_base: http://ollama:11434/v1
       api_key: none
       timeout: 60
       max_retries: 2
     model_info:
-      description: "Modelo rápido para consultas simples y baja latencia"
+      description: "Local (CPU) — alias rápido → llama3.2:3b vía Ollama"
       max_tokens: 32768
 
   - model_name: ups-main
     litellm_params:
-      model: openai/ups-main
-      api_base: http://ups-main:8000/v1
+      model: openai/llama3.2:3b
+      api_base: http://ollama:11434/v1
       api_key: none
       timeout: 120
       max_retries: 2
     model_info:
-      description: "Asistente académico general, programación, Sistemas Distribuidos"
+      description: "Local (CPU) — alias principal → llama3.2:3b vía Ollama"
       max_tokens: 32768
 
   - model_name: ups-reasoner
     litellm_params:
-      model: openai/ups-reasoner
-      api_base: http://ups-reasoner:8000/v1
+      model: openai/llama3.2:3b
+      api_base: http://ollama:11434/v1
       api_key: none
       timeout: 180
       max_retries: 1
     model_info:
-      description: "Modelo de razonamiento para análisis, planificación y rúbricas"
+      description: "Local (CPU) — alias razonador → llama3.2:3b vía Ollama"
       max_tokens: 32768
 
-# ups-pro y ups-embed se registran vía API cuando sus contenedores están activos.
-# Ver scripts/start-premium-model.sh para ups-pro.
+# ups-pro se registra dinámicamente con start-premium-model.sh --local

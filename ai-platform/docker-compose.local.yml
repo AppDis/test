@@ -1,0 +1,152 @@
+version: "3.9"
+
+# ─── Simulación local — Mac OS (A2251 Intel, sin GPU NVIDIA) ─────────────────
+#
+# Topología idéntica a docker-compose.yml (Gigabyte).
+# Única diferencia: backend de inferencia = Ollama (CPU) en lugar de vLLM (GPU).
+#
+# Uso:
+#   cp .env.local.example .env.local
+#   docker compose -f docker-compose.local.yml --env-file .env.local up -d
+#
+# Acceso:
+#   API:   http://localhost/v1/chat/completions
+#   Panel: http://localhost/ui
+#
+# Primer arranque: Ollama descarga el modelo (~2 GB). Requiere internet.
+# Rendimiento esperado en CPU Intel: ~5-15 tokens/s (suficiente para validar flujos).
+
+networks:
+  ups-internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+services:
+
+  # ─── Reverse Proxy ────────────────────────────────────────────────────────
+  # Mismo nginx/default.conf que producción
+  nginx:
+    image: nginx:alpine
+    container_name: ups-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - litellm
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─── LiteLLM Gateway ──────────────────────────────────────────────────────
+  # Mismo imagen y config que producción; config.local.yaml mapea
+  # los mismos aliases (ups-fast/main/reasoner) a Ollama en lugar de vLLM
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ups-litellm
+    expose:
+      - "4000"
+    volumes:
+      - ./litellm/config.local.yaml:/app/config.yaml:ro
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-local_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-dev-key}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:-local-salt-key}
+      UI_USERNAME: ${UI_USERNAME:-admin}
+      UI_PASSWORD: ${UI_PASSWORD:-admin-local-password}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      STORE_MODEL_IN_DB: "True"
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - ups-internal
+    restart: unless-stopped
+
+  # ─── Base de datos ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ups-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_password}
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-litellm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Cache ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ups-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend de inferencia (reemplaza los 3 servicios vLLM de producción) ──
+  # Un solo Ollama sirve los aliases ups-fast, ups-main y ups-reasoner.
+  # En producción cada alias tiene su propio contenedor vLLM con modelo dedicado.
+  ollama:
+    image: ollama/ollama
+    container_name: ups-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c",
+      "ollama serve & sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
+    healthcheck:
+      test: ["CMD-SHELL",
+        "curl -sf http://localhost:11434/api/tags | grep -q '${OLLAMA_MODEL:-llama3.2}'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
+
+  # ─── Modelo premium (bajo demanda) ───────────────────────────────────────
+  # En producción: contenedor vLLM con Qwen2.5-72B-AWQ (perfil premium).
+  # En local: contenedor liviano que simula el ciclo start/stop.
+  #   - Al iniciarse, el script registra ups-pro en LiteLLM apuntando a Ollama.
+  #   - Al detenerse, el alias queda inactivo hasta el próximo start.
+  # Usar: ./scripts/start-premium-model.sh --local
+  ups-pro:
+    image: alpine
+    container_name: ups-pro
+    command: ["sleep", "infinity"]
+    networks:
+      - ups-internal
+    profiles:
+      - premium
+    restart: unless-stopped
