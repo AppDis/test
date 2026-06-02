@@ -154,7 +154,6 @@ sudo systemctl restart docker
 **Verificar que Docker ve la GPU:**
 
 ```bash
-# Runtime nvidia disponible
 docker info | grep -i runtime
 ```
 
@@ -176,22 +175,11 @@ Default Runtime: runc
 
 ---
 
-## Paso 4 — Desplegar Fase 1
-
-### 4.1 Clonar el repositorio
-
-```bash
-mkdir -p ~/dgx-workspace
-cd ~/dgx-workspace
-git clone https://github.com/AppDis/test.git . -b claude/fase1-ups
-cd ai-platform
-```
-
-### 4.2 Preparar almacenamiento
+## Paso 4 — Preparar almacenamiento
 
 El equipo tiene un NVMe de 4 TB (SAMSUNG MZALC4T0HBL1). Se crea una partición dedicada
-para datos montada en `/data` — separada del sistema operativo, con espacio para modelos
-y otros usos futuros (datasets, backups, notebooks, etc.).
+montada en `/data` — separada del sistema operativo, con espacio para modelos y otros usos
+futuros (datasets, backups, notebooks, etc.).
 
 ```bash
 # Corregir tabla GPT para reconocer los 4 TB completos
@@ -237,30 +225,43 @@ Espacio requerido por modelo:
 
 Total mínimo para los 3 modelos base: **~100 GB libres** (disponible: 3.1 TB).
 
-### 4.3 Descargar modelos
+---
+
+## Paso 5 — Desplegar Fase 1
+
+### 5.1 Clonar el repositorio
+
+```bash
+mkdir -p ~/dgx-workspace
+cd ~/dgx-workspace
+git clone https://github.com/AppDis/test.git . -b claude/fase1-ups
+cd ai-platform
+```
+
+### 5.2 Descargar modelos
 
 > **Nota GB10 (memoria unificada):** el GB10 comparte RAM entre CPU y GPU. Con 128 GB de memoria
-> unificada puedes cargar modelos significativamente más grandes que en GPUs discretas convencionales.
+> unificada puedes cargar modelos más grandes que en GPUs discretas convencionales.
 > Los modelos AWQ (cuantizados) son la opción recomendada para maximizar el número de modelos activos.
 
 ```bash
 # Instalar huggingface-cli si no está
 pip install huggingface-hub
 
-# Qwen2.5-7B (ups-fast)
+# Qwen2.5-7B (ups-fast) ~15 GB
 huggingface-cli download Qwen/Qwen2.5-7B-Instruct \
   --local-dir /data/models/Qwen2.5-7B-Instruct
 
-# Qwen2.5-32B-AWQ (ups-main)
+# Qwen2.5-32B-AWQ (ups-main) ~20 GB
 huggingface-cli download Qwen/Qwen2.5-32B-Instruct-AWQ \
   --local-dir /data/models/Qwen2.5-32B-Instruct-AWQ
 
-# DeepSeek-R1-Distill-Qwen-32B (ups-reasoner)
+# DeepSeek-R1-Distill-Qwen-32B (ups-reasoner) ~65 GB
 huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \
   --local-dir /data/models/DeepSeek-R1-Distill-Qwen-32B
 ```
 
-### 4.4 Configurar variables de entorno
+### 5.3 Configurar variables de entorno
 
 ```bash
 cp .env.example .env
@@ -290,7 +291,7 @@ openssl rand -hex 32   # usar salida como LITELLM_MASTER_KEY
 openssl rand -hex 16   # usar salida como LITELLM_SALT_KEY
 ```
 
-### 4.5 Levantar la plataforma
+### 5.4 Levantar la plataforma
 
 ```bash
 docker compose up -d
@@ -308,7 +309,7 @@ ups-main   ├─→ independientes (vLLM tarda 5-15 min en cargar modelos)
 ups-reasoner ┘
 ```
 
-### 4.6 Monitorear el arranque
+### 5.5 Monitorear el arranque
 
 ```bash
 # Ver estado de todos los contenedores
@@ -324,7 +325,7 @@ docker logs -f ups-fast
 LiteLLM estará listo en ~30-60s.  
 Los contenedores vLLM tardan **5-15 minutos** (carga del modelo en GPU).
 
-### 4.7 Verificar la plataforma
+### 5.6 Verificar la plataforma
 
 ```bash
 # Health check básico
@@ -354,7 +355,7 @@ chmod +x scripts/healthcheck.sh
 LITELLM_MASTER_KEY=<tu-clave> ./scripts/healthcheck.sh
 ```
 
-### 4.8 Panel de administración
+### 5.7 Panel de administración
 
 Abrir en el navegador: `http://<IP-GIGABYTE>/ui`
 
@@ -363,7 +364,7 @@ Abrir en el navegador: `http://<IP-GIGABYTE>/ui`
 
 Desde el panel puedes: ver modelos registrados, crear API keys para estudiantes, monitorear uso y costos por usuario.
 
-### 4.9 Crear API keys para estudiantes
+### 5.8 Crear API keys para estudiantes
 
 ```bash
 chmod +x scripts/create-user-key.sh
