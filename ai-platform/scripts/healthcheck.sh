@@ -96,7 +96,12 @@ check_host_http  "http://localhost/health"   "nginx → /health"
 check_container_http "ups-litellm" "/health" "LiteLLM /health"
 
 if $LOCAL; then
-  check_container_http "ups-ollama" "/" "Ollama API"
+  # Ollama no tiene curl; verificar vía ollama list directamente
+  if docker exec ups-ollama ollama list 2>/dev/null | grep -q 'llama3.2'; then
+    ok "Ollama — llama3.2:3b disponible"
+  else
+    fail "Ollama — modelo no cargado"
+  fi
 else
   check_host_http "http://localhost:8001/v1/models" "ups-fast  /v1/models"
   check_host_http "http://localhost:8002/v1/models" "ups-main  /v1/models"

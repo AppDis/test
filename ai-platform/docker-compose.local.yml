@@ -128,12 +128,11 @@ services:
     entrypoint: ["/bin/sh", "-c",
       "ollama serve & sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
     healthcheck:
-      test: ["CMD-SHELL",
-        "curl -sf http://localhost:11434/api/tags | grep -q '${OLLAMA_MODEL:-llama3.2}'"]
-      interval: 15s
+      test: ["CMD-SHELL", "ollama list | grep -q 'llama3.2'"]
+      interval: 10s
       timeout: 10s
       retries: 30
-      start_period: 300s
+      start_period: 30s
 
   # ─── Modelo premium (bajo demanda) ───────────────────────────────────────
   # En producción: contenedor vLLM con Qwen2.5-72B-AWQ (perfil premium).
