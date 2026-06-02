@@ -1,6 +1,9 @@
 version: "3.9"
 
-# ─── Simulación local para Mac OS (A2251 Intel, sin GPU NVIDIA) ──────────────
+# ─── Simulación local — Mac OS (A2251 Intel, sin GPU NVIDIA) ─────────────────
+#
+# Topología idéntica a docker-compose.yml (Gigabyte).
+# Única diferencia: backend de inferencia = Ollama (CPU) en lugar de vLLM (GPU).
 #
 # Uso:
 #   cp .env.local.example .env.local
@@ -10,11 +13,11 @@ version: "3.9"
 #   API:   http://localhost/v1/chat/completions
 #   Panel: http://localhost/ui
 #
-# Nota: el primer arranque descarga el modelo (~2 GB). Necesita internet.
-# El modelo llama3.2:3b corre en CPU — esperar ~60 s para la primera respuesta.
+# Primer arranque: Ollama descarga el modelo (~2 GB). Requiere internet.
+# Rendimiento esperado en CPU Intel: ~5-15 tokens/s (suficiente para validar flujos).
 
 networks:
-  ups-local:
+  ups-internal:
     driver: bridge
 
 volumes:
@@ -25,9 +28,10 @@ volumes:
 services:
 
   # ─── Reverse Proxy ────────────────────────────────────────────────────────
+  # Mismo nginx/default.conf que producción
   nginx:
     image: nginx:alpine
-    container_name: ups-nginx-local
+    container_name: ups-nginx
     ports:
       - "80:80"
     volumes:
@@ -35,7 +39,7 @@ services:
     depends_on:
       - litellm
     networks:
-      - ups-local
+      - ups-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/health"]
@@ -43,31 +47,12 @@ services:
       timeout: 5s
       retries: 3
 
-  # ─── Ollama (backend de inferencia, CPU-only en Docker/Mac) ──────────────
-  ollama:
-    image: ollama/ollama
-    container_name: ups-ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    expose:
-      - "11434"
-    networks:
-      - ups-local
-    restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c",
-      "ollama serve & sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
-    healthcheck:
-      test: ["CMD-SHELL",
-        "curl -sf http://localhost:11434/api/tags | grep -q '${OLLAMA_MODEL:-llama3.2}'"]
-      interval: 15s
-      timeout: 10s
-      retries: 30
-      start_period: 300s
-
   # ─── LiteLLM Gateway ──────────────────────────────────────────────────────
+  # Mismo imagen y config que producción; config.local.yaml mapea
+  # los mismos aliases (ups-fast/main/reasoner) a Ollama en lugar de vLLM
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: ups-litellm-local
+    container_name: ups-litellm
     expose:
       - "4000"
     volumes:
@@ -81,7 +66,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       STORE_MODEL_IN_DB: "True"
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2"]
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,13 +75,13 @@ services:
       ollama:
         condition: service_healthy
     networks:
-      - ups-local
+      - ups-internal
     restart: unless-stopped
 
   # ─── Base de datos ────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: ups-postgres-local
+    container_name: ups-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-litellm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_password}
@@ -104,7 +89,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - ups-local
+      - ups-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-litellm}"]
@@ -115,14 +100,53 @@ services:
   # ─── Cache ────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: ups-redis-local
+    container_name: ups-redis
     volumes:
       - redis_data:/data
     networks:
-      - ups-local
+      - ups-internal
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ─── Backend de inferencia (reemplaza los 3 servicios vLLM de producción) ──
+  # Un solo Ollama sirve los aliases ups-fast, ups-main y ups-reasoner.
+  # En producción cada alias tiene su propio contenedor vLLM con modelo dedicado.
+  ollama:
+    image: ollama/ollama
+    container_name: ups-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c",
+      "ollama serve & sleep 8 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
+    healthcheck:
+      test: ["CMD-SHELL",
+        "curl -sf http://localhost:11434/api/tags | grep -q '${OLLAMA_MODEL:-llama3.2}'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
+
+  # ─── Modelo premium (bajo demanda) ───────────────────────────────────────
+  # En producción: contenedor vLLM con Qwen2.5-72B-AWQ (perfil premium).
+  # En local: contenedor liviano que simula el ciclo start/stop.
+  #   - Al iniciarse, el script registra ups-pro en LiteLLM apuntando a Ollama.
+  #   - Al detenerse, el alias queda inactivo hasta el próximo start.
+  # Usar: ./scripts/start-premium-model.sh --local
+  ups-pro:
+    image: alpine
+    container_name: ups-pro
+    command: ["sleep", "infinity"]
+    networks:
+      - ups-internal
+    profiles:
+      - premium
+    restart: unless-stopped

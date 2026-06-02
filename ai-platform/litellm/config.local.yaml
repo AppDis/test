@@ -3,6 +3,9 @@ general_settings:
   database_url: os.environ/DATABASE_URL
   store_model_in_db: true
 
+  max_budget: null
+  budget_duration: null
+
 router_settings:
   routing_strategy: least-busy
   num_retries: 2
@@ -14,15 +17,18 @@ litellm_settings:
   request_timeout: 180
   drop_params: true
 
+  success_callback: ["prometheus_system"]
+  failure_callback: ["prometheus_system"]
+
   cache: true
   cache_params:
     cache_type: redis
     host: redis
     port: 6379
 
-# Todos los aliases apuntan al mismo modelo local (llama3.2:3b).
-# Esto simula la misma topología de aliases que en producción sin necesitar GPU.
-# En Mac Intel Docker corre en CPU: esperar ~5-15 tokens/s.
+# Los tres aliases siempre activos apuntan a Ollama (un solo backend CPU).
+# ups-pro se registra vía API al ejecutar start-premium-model.sh --local
+# Mismos alias names que producción → los scripts y pruebas de API son idénticos.
 
 model_list:
 
@@ -31,18 +37,22 @@ model_list:
       model: openai/llama3.2:3b
       api_base: http://ollama:11434/v1
       api_key: none
-      timeout: 120
+      timeout: 60
+      max_retries: 2
     model_info:
-      description: "Simulación local — alias rápido → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — alias rápido → llama3.2:3b vía Ollama"
+      max_tokens: 32768
 
   - model_name: ups-main
     litellm_params:
       model: openai/llama3.2:3b
       api_base: http://ollama:11434/v1
       api_key: none
-      timeout: 180
+      timeout: 120
+      max_retries: 2
     model_info:
-      description: "Simulación local — alias principal → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — alias principal → llama3.2:3b vía Ollama"
+      max_tokens: 32768
 
   - model_name: ups-reasoner
     litellm_params:
@@ -50,14 +60,9 @@ model_list:
       api_base: http://ollama:11434/v1
       api_key: none
       timeout: 180
+      max_retries: 1
     model_info:
-      description: "Simulación local — alias razonador → llama3.2:3b vía Ollama"
+      description: "Local (CPU) — alias razonador → llama3.2:3b vía Ollama"
+      max_tokens: 32768
 
-  - model_name: ups-pro
-    litellm_params:
-      model: openai/llama3.2:3b
-      api_base: http://ollama:11434/v1
-      api_key: none
-      timeout: 300
-    model_info:
-      description: "Simulación local — alias premium → llama3.2:3b vía Ollama"
+# ups-pro se registra dinámicamente con start-premium-model.sh --local
