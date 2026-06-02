@@ -245,19 +245,30 @@ cd ai-platform
 > Los modelos AWQ (cuantizados) son la opción recomendada para maximizar el número de modelos activos.
 
 ```bash
-# Instalar huggingface-cli si no está
-pip install huggingface-hub
+# Instalar hf (huggingface-hub) — Ubuntu 24.04 requiere pipx
+sudo apt install -y pipx
+pipx install huggingface-hub
+pipx ensurepath
+source ~/.bashrc   # o abrir nueva terminal
 
+# Verificar
+hf --version
+```
+
+> En Ubuntu 24.04 no usar `pip install` directo — el sistema está externally-managed.  
+> El comando es `hf` (no `huggingface-cli`, que está deprecado desde v1.17+).
+
+```bash
 # Qwen2.5-7B (ups-fast) ~15 GB
-huggingface-cli download Qwen/Qwen2.5-7B-Instruct \
+hf download Qwen/Qwen2.5-7B-Instruct \
   --local-dir /data/models/Qwen2.5-7B-Instruct
 
 # Qwen2.5-32B-AWQ (ups-main) ~20 GB
-huggingface-cli download Qwen/Qwen2.5-32B-Instruct-AWQ \
+hf download Qwen/Qwen2.5-32B-Instruct-AWQ \
   --local-dir /data/models/Qwen2.5-32B-Instruct-AWQ
 
 # DeepSeek-R1-Distill-Qwen-32B (ups-reasoner) ~65 GB
-huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \
+hf download deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \
   --local-dir /data/models/DeepSeek-R1-Distill-Qwen-32B
 ```
 
