@@ -18,7 +18,7 @@ Sin él, ningún proceso puede acceder al hardware de cómputo.
 lsb_release -a
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 No LSB modules are available.
@@ -34,7 +34,7 @@ Codename:       noble
 uname -m
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 aarch64
@@ -53,7 +53,7 @@ lspci | grep -i nvidia
 Esto lista todos los dispositivos PCI fabricados por NVIDIA. El resultado incluye los puentes
 PCIe internos del GB10 y la GPU propiamente dicha (línea con `VGA compatible controller`).
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 0001:00:00.0 PCI bridge: NVIDIA Corporation Device 229c (rev a1)
@@ -67,7 +67,7 @@ PCIe internos del GB10 y la GPU propiamente dicha (línea con `VGA compatible co
 nvidia-smi
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -137,7 +137,7 @@ plataforma AI de forma aislada y reproducible.
 docker --version
 ```
 
-**Salida real del equipo** (ya estaba instalado):
+**Salida esperada del equipo** (ya estaba instalado):
 
 ```
 Docker version 29.2.1, build 08215b3
@@ -234,7 +234,7 @@ docker compose version
 docker run --rm hello-world
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 Hello from Docker!
@@ -271,7 +271,7 @@ Sin este componente, los contenedores vLLM no pueden ejecutar inferencia en GPU.
 nvidia-ctk --version
 ```
 
-**Salida real del equipo** (ya estaba instalado):
+**Salida esperada del equipo** (ya estaba instalado):
 
 ```
 nvidia-ctk version 1.19.1
@@ -308,7 +308,7 @@ sudo systemctl restart docker
 
 > Este comando modifica `/etc/docker/daemon.json` para registrar el runtime `nvidia`.
 
-**Situación real del equipo antes de ejecutar este paso:**
+**Situación del equipo antes de ejecutar este paso:**
 
 ```bash
 docker info | grep -i runtime
@@ -327,7 +327,7 @@ El runtime `nvidia` **no estaba registrado** a pesar de que el toolkit sí estab
 docker info | grep -i runtime
 ```
 
-**Salida real después de configurar:**
+**Salida esperada después de configurar:**
 
 ```
 Runtimes: io.containerd.runc.v2 nvidia runc
@@ -341,7 +341,7 @@ La presencia de `nvidia` en la lista confirma que los contenedores pueden solici
 ## Paso 4 — Preparar almacenamiento
 
 El sistema operativo está instalado en una partición de ~476 GB del NVMe de 4 TB.
-Los ~3.5 TB restantes están sin particionar. En este paso se crea una partición dedicada
+Los ~3.5 TB restantes están sin particionar. En este paso se creará una partición dedicada
 montada en `/data` para almacenar modelos, datasets y otros datos de la plataforma,
 separados del sistema operativo.
 
@@ -355,7 +355,7 @@ separados del sistema operativo.
 lsblk /dev/nvme0n1
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
@@ -372,7 +372,7 @@ El disco físico tiene 3.7 TB pero solo 476 GB están particionados. El resto es
 sudo parted /dev/nvme0n1 print
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 Warning: Not all of the space available to /dev/nvme0n1 appears to be used, you can fix
@@ -441,7 +441,7 @@ sudo chown -R $USER:$USER /data
 df -h /data
 ```
 
-**Salida real del equipo:**
+**Salida esperada del equipo:**
 
 ```
 Filesystem      Size  Used Avail Use% Mounted on

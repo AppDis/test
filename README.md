@@ -5,7 +5,7 @@ habilitándolo como nodo de cómputo AI listo para futuras prácticas de la carr
 
 ## Objetivo
 
-Al completar esta práctica el estudiante habrá:
+Al completar esta práctica se habrá:
 
 - Verificado que el hardware GPU está correctamente instalado y operativo
 - Instalado y configurado Docker Engine con soporte nativo para GPU
@@ -35,5 +35,4 @@ Al completar esta práctica el estudiante habrá:
 
 ---
 
-> Una vez completada esta práctica, el equipo queda listo para el despliegue de la plataforma AI:  
-> [`claude/fase1-ups`](https://github.com/AppDis/test/tree/claude/fase1-ups)
+> Una vez completada esta práctica, el equipo queda listo para el despliegue de practicas en el equipo DGX
