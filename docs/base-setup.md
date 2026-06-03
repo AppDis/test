@@ -12,6 +12,38 @@ Cada paso debe ejecutarse, verificarse y comprenderse antes de continuar al sigu
 El driver NVIDIA es el componente que permite al sistema operativo comunicarse con la GPU.
 Sin él, ningún proceso puede acceder al hardware de cómputo.
 
+### Verificar versión del sistema operativo
+
+```bash
+lsb_release -a
+```
+
+**Salida real del equipo:**
+
+```
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 24.04.4 LTS
+Release:        24.04
+Codename:       noble
+```
+
+### Verificar arquitectura del procesador
+
+```bash
+uname -m
+```
+
+**Salida real del equipo:**
+
+```
+aarch64
+```
+
+> `aarch64` es el nombre técnico de la arquitectura ARM64. Es importante tenerlo en cuenta
+> porque las imágenes Docker y los binarios deben ser compatibles con esta arquitectura —
+> no se pueden usar imágenes x86_64 (AMD/Intel) directamente.
+
 ### ¿Qué GPU tiene el equipo?
 
 ```bash
@@ -21,21 +53,33 @@ lspci | grep -i nvidia
 Esto lista todos los dispositivos PCI fabricados por NVIDIA. El resultado incluye los puentes
 PCIe internos del GB10 y la GPU propiamente dicha (línea con `VGA compatible controller`).
 
+**Salida real del equipo:**
+
+```
+0001:00:00.0 PCI bridge: NVIDIA Corporation Device 229c (rev a1)
+0001:01:00.0 PCI bridge: NVIDIA Corporation Device 229d (rev a1)
+0001:02:00.0 VGA compatible controller: NVIDIA Corporation Device 2963 (rev a1)
+```
+
 ### ¿Está el driver instalado?
 
 ```bash
 nvidia-smi
 ```
 
-**Salida esperada:**
+**Salida real del equipo:**
 
 ```
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 580.159.03             Driver Version: 580.159.03     CUDA Version: 13.0     |
 +-----------------------------------------+------------------------+----------------------+
 | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
 |   0  NVIDIA GB10                    On  |   0000000F:01:00.0 Off |                  N/A |
-| N/A   34C    P8              4W /  N/A  | Not Supported          |      0%      Default |
+| N/A   34C    P8              4W /  N/A  |      Not Supported     |      0%      Default |
+|                                         |                        |             Disabled |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -63,7 +107,7 @@ sudo apt purge -y 'nvidia-*' 'libnvidia-*' cuda-drivers 2>/dev/null || true
 sudo apt autoremove -y
 
 # Agregar repositorio oficial NVIDIA para Ubuntu 24.04
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt update
 
@@ -73,6 +117,9 @@ sudo apt install -y nvidia-driver-580
 # Reiniciar y verificar
 sudo reboot
 ```
+
+> En ARM64 (aarch64) el repositorio NVIDIA usa el path `sbsa` en lugar de `x86_64`.
+> `SBSA` significa *Server Base System Architecture* — el estándar ARM para servidores.
 
 > Si `nvidia-smi` sigue fallando después del reinicio: verificar que **Secure Boot esté
 > deshabilitado** en la BIOS/UEFI. El Secure Boot impide cargar módulos del kernel no firmados.
@@ -88,6 +135,20 @@ plataforma AI de forma aislada y reproducible.
 
 ```bash
 docker --version
+```
+
+**Salida real del equipo** (ya estaba instalado):
+
+```
+Docker version 29.2.1, build 08215b3
+```
+
+```bash
+docker compose version
+```
+
+```
+Docker Compose version v5.0.2
 ```
 
 Si responde con una versión → verificar que el usuario tenga permisos y saltar al final de este paso.  
@@ -173,8 +234,26 @@ docker compose version
 docker run --rm hello-world
 ```
 
-La salida de `hello-world` debe incluir `arm64v8` — confirma que Docker corre nativamente
-en ARM64 y no en modo de emulación.
+**Salida real del equipo:**
+
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (linux/arm64/v8)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
+...
+```
+
+> La línea `(linux/arm64/v8)` confirma que Docker descargó la imagen ARM64 nativa y no
+> la versión x86 emulada. Si apareciera `(linux/amd64)`, significaría que Docker está
+> corriendo en modo de emulación, lo cual es mucho más lento.
 
 ---
 
@@ -190,6 +269,13 @@ Sin este componente, los contenedores vLLM no pueden ejecutar inferencia en GPU.
 
 ```bash
 nvidia-ctk --version
+```
+
+**Salida real del equipo** (ya estaba instalado):
+
+```
+nvidia-ctk version 1.19.1
+commit: b18fc6ded64aae8d69a10e1fe49d4e0e8571fc9b
 ```
 
 > Aunque el toolkit esté instalado, el runtime puede no estar registrado en Docker.
@@ -212,13 +298,28 @@ sudo apt install -y nvidia-container-toolkit
 
 ### Registrar el runtime nvidia en Docker
 
+Este paso es obligatorio aunque el toolkit ya esté instalado. Sin él, el runtime `nvidia`
+no aparece en Docker y el flag `--gpus all` no tiene efecto.
+
 ```bash
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
 > Este comando modifica `/etc/docker/daemon.json` para registrar el runtime `nvidia`.
-> Sin este paso, el flag `--gpus all` en `docker run` no tiene efecto.
+
+**Situación real del equipo antes de ejecutar este paso:**
+
+```bash
+docker info | grep -i runtime
+```
+
+```
+Runtimes: io.containerd.runc.v2 runc
+Default Runtime: runc
+```
+
+El runtime `nvidia` **no estaba registrado** a pesar de que el toolkit sí estaba instalado.
 
 ### Verificar
 
@@ -226,7 +327,8 @@ sudo systemctl restart docker
 docker info | grep -i runtime
 ```
 
-Salida esperada:
+**Salida real después de configurar:**
+
 ```
 Runtimes: io.containerd.runc.v2 nvidia runc
 Default Runtime: runc
@@ -253,7 +355,16 @@ separados del sistema operativo.
 lsblk /dev/nvme0n1
 ```
 
-Verás que `nvme0n1p2` (el SO) termina en ~476 GB y el resto del disco aparece sin partición.
+**Salida real del equipo:**
+
+```
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+nvme0n1     259:0    0   3.7T  0 disk
+├─nvme0n1p1 259:1    0   512M  0 part /boot/efi
+└─nvme0n1p2 259:2    0 475.9G  0 part /
+```
+
+El disco físico tiene 3.7 TB pero solo 476 GB están particionados. El resto es espacio libre.
 
 ### Ver el layout exacto con parted
 
@@ -261,8 +372,27 @@ Verás que `nvme0n1p2` (el SO) termina en ~476 GB y el resto del disco aparece s
 sudo parted /dev/nvme0n1 print
 ```
 
-> Si aparece el aviso *"Not all of the space available..."*, responder `Fix`.
-> Esto corrige la tabla GPT para reconocer los 4 TB completos del disco.
+**Salida real del equipo:**
+
+```
+Warning: Not all of the space available to /dev/nvme0n1 appears to be used, you can fix
+the GPT to use all of the space (an extra 6837223424 blocks) or continue with the current
+setting?
+Fix/Ignore? Fix
+
+Model: Samsung MZQL23T8HCLS-00A07 (nvme)
+Disk /dev/nvme0n1: 4097GB
+Sector size (logical/physical): 512B/4096B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End    Size    File system  Name  Flags
+ 1      1049kB  538MB  537MB   fat32              boot, esp
+ 2      538MB   512GB  512GB   ext4
+```
+
+> Al responder `Fix`, parted actualiza la tabla GPT para reconocer los 4097 GB completos
+> del disco. Antes de este fix, el sistema solo veía 476 GB disponibles.
 
 ### Crear la partición
 
@@ -283,9 +413,10 @@ sudo mkfs.ext4 /dev/nvme0n1p3
 > `ext4` es el sistema de archivos estándar de Linux. El proceso crea el journal,
 > las tablas de inodos y los superblocks de respaldo.
 
-### Montar en /data
+### Crear directorio y montar
 
 ```bash
+sudo mkdir -p /data
 sudo mount /dev/nvme0n1p3 /data
 ```
 
@@ -301,7 +432,6 @@ echo "/dev/nvme0n1p3 /data ext4 defaults 0 2" | sudo tee -a /etc/fstab
 ### Asignar permisos al usuario
 
 ```bash
-sudo mkdir -p /data/models
 sudo chown -R $USER:$USER /data
 ```
 
@@ -311,7 +441,8 @@ sudo chown -R $USER:$USER /data
 df -h /data
 ```
 
-Salida esperada:
+**Salida real del equipo:**
+
 ```
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/nvme0n1p3  3.3T   28K  3.1T   1% /data
@@ -344,6 +475,29 @@ docker info 2>/dev/null | grep -i runtime
 echo ""
 echo "=== Almacenamiento /data ==="
 df -h /data
+```
+
+**Salida esperada en este equipo:**
+
+```
+=== Sistema ===
+Description:    Ubuntu 24.04.4 LTS
+aarch64
+
+=== GPU ===
+NVIDIA GB10, 580.159.03
+
+=== Docker ===
+Docker version 29.2.1, build 08215b3
+Docker Compose version v5.0.2
+
+=== Runtime NVIDIA en Docker ===
+Runtimes: io.containerd.runc.v2 nvidia runc
+Default Runtime: runc
+
+=== Almacenamiento /data ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p3  3.3T   28K  3.1T   1% /data
 ```
 
 ---
