@@ -12,7 +12,7 @@ Cada paso debe ejecutarse, verificarse y comprenderse antes de continuar al sigu
 El driver NVIDIA es el componente que permite al sistema operativo comunicarse con la GPU.
 Sin él, ningún proceso puede acceder al hardware de cómputo.
 
-### Verificar versión del sistema operativo
+### 1.1 Verificar versión del sistema operativo
 
 ```bash
 lsb_release -a
@@ -28,7 +28,7 @@ Release:        24.04
 Codename:       noble
 ```
 
-### Verificar arquitectura del procesador
+### 1.2 Verificar arquitectura del procesador
 
 ```bash
 uname -m
@@ -44,7 +44,7 @@ aarch64
 > porque las imágenes Docker y los binarios deben ser compatibles con esta arquitectura —
 > no se pueden usar imágenes x86_64 (AMD/Intel) directamente.
 
-### ¿Qué GPU tiene el equipo?
+### 1.3 ¿Qué GPU tiene el equipo?
 
 ```bash
 lspci | grep -i nvidia
@@ -61,7 +61,7 @@ PCIe internos del GB10 y la GPU propiamente dicha (línea con `VGA compatible co
 0001:02:00.0 VGA compatible controller: NVIDIA Corporation Device 2963 (rev a1)
 ```
 
-### ¿Está el driver instalado?
+### 1.4 ¿Está el driver instalado?
 
 ```bash
 nvidia-smi
@@ -106,7 +106,7 @@ sudo apt install -y build-essential dkms linux-headers-$(uname -r)
 sudo apt purge -y 'nvidia-*' 'libnvidia-*' cuda-drivers 2>/dev/null || true
 sudo apt autoremove -y
 
-# Agregar repositorio oficial NVIDIA para Ubuntu 24.04
+# Agregar repositorio oficial NVIDIA para Ubuntu 24.04 ARM64
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt update
@@ -131,7 +131,7 @@ sudo reboot
 Docker es la plataforma de contenedores que usaremos para ejecutar los servicios de la
 plataforma AI de forma aislada y reproducible.
 
-### Verificar si ya está instalado
+### 2.1 Verificar si ya está instalado
 
 ```bash
 docker --version
@@ -143,18 +143,11 @@ docker --version
 Docker version 29.2.1, build 08215b3
 ```
 
-```bash
-docker compose version
-```
+- Si responde con una versión y `docker ps` funciona sin error → continuar al paso **2.7 — Agregar el usuario al grupo docker**.  
+- Si responde con una versión pero `docker ps` falla con *permission denied* → continuar al paso **2.7 — Agregar el usuario al grupo docker**.  
+- Si no está instalado → continuar con el paso **2.2**.
 
-```
-Docker Compose version v5.0.2
-```
-
-Si responde con una versión → verificar que el usuario tenga permisos y saltar al final de este paso.  
-Si no está instalado → seguir los pasos a continuación.
-
-### Limpiar versiones anteriores
+### 2.2 Limpiar versiones anteriores
 
 ```bash
 sudo apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
@@ -163,14 +156,14 @@ sudo apt autoremove -y
 
 > Es importante limpiar versiones antiguas para evitar conflictos entre paquetes.
 
-### Instalar dependencias
+### 2.3 Instalar dependencias
 
 ```bash
 sudo apt update
 sudo apt install -y ca-certificates curl gnupg apt-transport-https lsb-release
 ```
 
-### Agregar el repositorio oficial de Docker
+### 2.4 Agregar el repositorio oficial de Docker
 
 Ubuntu no incluye la versión más reciente de Docker en sus repositorios oficiales.
 Hay que agregar el repositorio de Docker Inc. directamente:
@@ -196,7 +189,7 @@ sudo apt update
 > Detecta automáticamente la arquitectura del sistema (en este equipo: `arm64`).
 > Así el mismo comando funciona en x86 y ARM sin modificación.
 
-### Instalar Docker
+### 2.5 Instalar Docker
 
 ```bash
 sudo apt install -y \
@@ -207,14 +200,14 @@ sudo apt install -y \
   docker-compose-plugin
 ```
 
-### Habilitar el servicio
+### 2.6 Habilitar el servicio
 
 ```bash
 sudo systemctl enable docker
 sudo systemctl start docker
 ```
 
-### Agregar el usuario al grupo docker
+### 2.7 Agregar el usuario al grupo docker
 
 Sin esto, cada comando `docker` requiere `sudo`. Esto ocurre porque el socket de Docker
 (`/var/run/docker.sock`) solo es accesible por root y el grupo `docker`.
@@ -226,7 +219,7 @@ newgrp docker
 
 > `newgrp docker` abre un nuevo subshell con el grupo activo sin necesidad de cerrar sesión.
 
-### Verificar
+### 2.8 Verificar
 
 ```bash
 docker --version
@@ -237,6 +230,9 @@ docker run --rm hello-world
 **Salida esperada del equipo:**
 
 ```
+Docker version 29.2.1, build 08215b3
+Docker Compose version v5.0.2
+
 Hello from Docker!
 This message shows that your installation appears to be working correctly.
 
@@ -265,7 +261,7 @@ acceder al driver NVIDIA instalado en el host.
 
 Sin este componente, los contenedores vLLM no pueden ejecutar inferencia en GPU.
 
-### Verificar si ya está instalado
+### 3.1 Verificar si ya está instalado
 
 ```bash
 nvidia-ctk --version
@@ -278,10 +274,13 @@ nvidia-ctk version 1.19.1
 commit: b18fc6ded64aae8d69a10e1fe49d4e0e8571fc9b
 ```
 
-> Aunque el toolkit esté instalado, el runtime puede no estar registrado en Docker.
-> **Siempre ejecutar la configuración del runtime** (último bloque de este paso).
+- Si está instalado → continuar directamente al paso **3.3 — Registrar el runtime nvidia en Docker**.
+- Si no está instalado → continuar con el paso **3.2**.
 
-### Instalar si no está presente
+> El runtime puede no estar registrado en Docker aunque el toolkit esté instalado.
+> El paso **3.3** es obligatorio en ambos casos.
+
+### 3.2 Instalar si no está presente
 
 ```bash
 # Agregar repositorio NVIDIA Container Toolkit
@@ -296,7 +295,7 @@ sudo apt update
 sudo apt install -y nvidia-container-toolkit
 ```
 
-### Registrar el runtime nvidia en Docker
+### 3.3 Registrar el runtime nvidia en Docker
 
 Este paso es obligatorio aunque el toolkit ya esté instalado. Sin él, el runtime `nvidia`
 no aparece en Docker y el flag `--gpus all` no tiene efecto.
@@ -321,7 +320,7 @@ Default Runtime: runc
 
 El runtime `nvidia` **no estaba registrado** a pesar de que el toolkit sí estaba instalado.
 
-### Verificar
+### 3.4 Verificar
 
 ```bash
 docker info | grep -i runtime
@@ -349,7 +348,7 @@ separados del sistema operativo.
 > Si el SO se corrompe o necesita reinstalación, los datos en `/data` quedan intactos.
 > También facilita hacer backups selectivos y controlar el espacio independientemente.
 
-### Ver el estado actual del disco
+### 4.1 Ver el estado actual del disco
 
 ```bash
 lsblk /dev/nvme0n1
@@ -366,7 +365,7 @@ nvme0n1     259:0    0   3.7T  0 disk
 
 El disco físico tiene 3.7 TB pero solo 476 GB están particionados. El resto es espacio libre.
 
-### Ver el layout exacto con parted
+### 4.2 Ver el layout exacto con parted
 
 ```bash
 sudo parted /dev/nvme0n1 print
@@ -394,7 +393,7 @@ Number  Start   End    Size    File system  Name  Flags
 > Al responder `Fix`, parted actualiza la tabla GPT para reconocer los 4097 GB completos
 > del disco. Antes de este fix, el sistema solo veía 476 GB disponibles.
 
-### Crear la partición
+### 4.3 Crear la partición
 
 ```bash
 sudo parted -a optimal /dev/nvme0n1 mkpart primary ext4 512GB 100%
@@ -404,7 +403,7 @@ sudo parted -a optimal /dev/nvme0n1 mkpart primary ext4 512GB 100%
 > `100%` indica que la nueva partición ocupa todo el espacio restante.  
 > `-a optimal` alinea la partición al tamaño óptimo de sector del NVMe.
 
-### Formatear con ext4
+### 4.4 Formatear con ext4
 
 ```bash
 sudo mkfs.ext4 /dev/nvme0n1p3
@@ -413,14 +412,14 @@ sudo mkfs.ext4 /dev/nvme0n1p3
 > `ext4` es el sistema de archivos estándar de Linux. El proceso crea el journal,
 > las tablas de inodos y los superblocks de respaldo.
 
-### Crear directorio y montar
+### 4.5 Crear directorio y montar
 
 ```bash
 sudo mkdir -p /data
 sudo mount /dev/nvme0n1p3 /data
 ```
 
-### Configurar montaje automático al reiniciar
+### 4.6 Configurar montaje automático al reiniciar
 
 ```bash
 echo "/dev/nvme0n1p3 /data ext4 defaults 0 2" | sudo tee -a /etc/fstab
@@ -429,13 +428,13 @@ echo "/dev/nvme0n1p3 /data ext4 defaults 0 2" | sudo tee -a /etc/fstab
 > `/etc/fstab` (filesystem table) es el archivo que el sistema lee al arrancar para
 > montar las particiones automáticamente. Sin esta línea, `/data` no se monta tras un reinicio.
 
-### Asignar permisos al usuario
+### 4.7 Asignar permisos al usuario
 
 ```bash
 sudo chown -R $USER:$USER /data
 ```
 
-### Verificar
+### 4.8 Verificar
 
 ```bash
 df -h /data
