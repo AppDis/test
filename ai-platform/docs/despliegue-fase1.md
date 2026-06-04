@@ -4,8 +4,13 @@ Guía completa para poner en producción la plataforma desde cero.
 Sistema objetivo: **Ubuntu 24.04.4 LTS** con GPU NVIDIA GB10 (Grace Blackwell).
 
 > **Equipo validado:** NVIDIA GB10 · Driver 580.159.03 · CUDA 13.0 · Memoria unificada CPU+GPU.  
-> La GPU GB10 usa arquitectura de memoria unificada — CPU y GPU comparten el mismo pool de RAM,  
-> lo que permite cargar modelos más grandes que en GPUs discretas convencionales.
+> La GPU GB10 usa arquitectura de memoria unificada — CPU y GPU comparten el mismo pool de RAM
+> (121.69 GiB disponibles en producción).  
+>
+> **Límite real de memoria en GB10:** los 3 modelos BF16 juntos (7B + 32B-AWQ + 32B BF16) requieren
+> ~124 GB y **no caben simultáneamente** en 121 GB. La configuración por defecto arranca
+> `ups-fast` + `ups-main` (modo normal). `ups-reasoner` es on-demand y requiere detener `ups-main`
+> primero — ver [Paso 5.9](#paso-59--cambio-de-modo-on-demand).
 
 ---
 
@@ -308,6 +313,9 @@ openssl rand -hex 16   # usar salida como LITELLM_SALT_KEY
 docker compose up -d
 ```
 
+> **Nota GB10:** `ups-reasoner` tiene `profiles: [reasoning]` y **no arranca** con este comando.
+> Modo por defecto: `ups-fast` + `ups-main` activos.
+
 Los contenedores arrancan en este orden (controlado por `depends_on`):
 
 ```
@@ -315,9 +323,25 @@ postgres (healthy) ─┐
                      ├─→ litellm → nginx
 redis (healthy) ────┘
 
-ups-fast  ─┐
-ups-main   ├─→ independientes (vLLM tarda 5-15 min en cargar modelos)
-ups-reasoner ┘
+ups-fast  ─┬─→ independientes (vLLM tarda 5-15 min en cargar modelos en GPU)
+ups-main  ─┘
+```
+
+**Salida esperada al ejecutar (primera vez — descarga imágenes):**
+
+```
+✔ redis Pulled
+✔ postgres Pulled
+✔ litellm Pulled
+✔ ups-fast Pulled     # imagen ARM64 ~11 GB: vllm/vllm-openai:latest-aarch64-cu129-ubuntu2404
+✔ ups-main Pulled
+[+] Running 7/7
+ ✔ Container ups-postgres  Healthy
+ ✔ Container ups-redis     Healthy
+ ✔ Container ups-litellm   Started
+ ✔ Container ups-nginx     Started
+ ✔ Container ups-fast      Started
+ ✔ Container ups-main      Started
 ```
 
 ### 5.5 Monitorear el arranque
@@ -326,15 +350,36 @@ ups-reasoner ┘
 # Ver estado de todos los contenedores
 watch docker ps
 
-# Logs de LiteLLM (esperar "Application startup complete")
+# Logs de LiteLLM (primera vez: ~109 migraciones Prisma, luego "Application startup complete")
 docker logs -f ups-litellm
 
-# Logs de un modelo vLLM (esperar "Uvicorn running on...")
+# Logs de un modelo vLLM (esperar "Uvicorn running on http://0.0.0.0:8000")
 docker logs -f ups-fast
+docker logs -f ups-main
 ```
 
-LiteLLM estará listo en ~30-60s.  
-Los contenedores vLLM tardan **5-15 minutos** (carga del modelo en GPU).
+**Tiempos reales en el GB10:**
+
+| Servicio | Tiempo hasta healthy |
+|----------|---------------------|
+| postgres | ~5 s |
+| redis | ~3 s |
+| litellm | ~60 s (primera vez: 109 migraciones Prisma) |
+| nginx | ~15 s |
+| ups-fast (7B) | ~3-5 min |
+| ups-main (32B AWQ) | ~10-12 min |
+
+**Estado esperado cuando todo está listo:**
+
+```
+CONTAINER ID   IMAGE                                          STATUS
+ups-nginx      nginx:alpine                                   Up X min (healthy)
+ups-litellm    ghcr.io/berriai/litellm:main-latest            Up X min
+ups-fast       vllm/vllm-openai:latest-aarch64-cu129-...     Up X min (healthy)
+ups-main       vllm/vllm-openai:latest-aarch64-cu129-...     Up X min (healthy)
+ups-postgres   postgres:16-alpine                             Up X min (healthy)
+ups-redis      redis:7-alpine                                 Up X min (healthy)
+```
 
 ### 5.6 Verificar la plataforma
 
@@ -384,12 +429,75 @@ LITELLM_MASTER_KEY=<tu-clave> ./scripts/create-user-key.sh
 
 O desde el panel `/ui` → **API Keys** → **Create Key**.
 
+### 5.8.1 Usar el chat integrado del panel (`/ui/chat`)
+
+El chat en `/ui/chat` requiere autenticación con una API key de LiteLLM (distinta de la contraseña del panel).
+
+**Pasos en LiteLLM v1.82.6:**
+
+1. Ir a `http://<IP>/ui` → iniciar sesión con `UI_USERNAME` / `UI_PASSWORD`
+2. En el menú lateral: **API Keys** → **Create Key**
+3. Crear una key (puede ser la master key `LITELLM_MASTER_KEY` o una nueva)
+4. En `/ui/chat`: hacer clic en el icono de engranaje (⚙️) en la esquina superior derecha
+5. En **API Key** pegar la clave creada → guardar
+6. Seleccionar modelo (`ups-fast`, `ups-main`) y enviar mensaje
+
+> **Nota:** La sección "Credentials" del panel es para conexiones OAuth de servidores MCP,
+> **no** para la autenticación del chat. El campo de API key del chat está en el engranaje (⚙️).
+
+**Verificar API directamente (sin UI):**
+
+```bash
+curl http://<IP-GIGABYTE>/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ups-fast",
+    "messages": [{"role": "user", "content": "Di solo: funcionando"}],
+    "max_tokens": 10
+  }'
+```
+
+### 5.9 — Cambio de modo on-demand
+
+Por limitación de memoria del GB10 (121 GB), `ups-reasoner` (DeepSeek-R1 32B BF16, ~77 GB) no puede
+correr junto con `ups-main` (32B AWQ, ~22 GB). Se intercambian on-demand:
+
+**Activar modo razonador** (detiene ups-main, levanta ups-reasoner):
+
+```bash
+chmod +x scripts/start-reasoner.sh
+LITELLM_MASTER_KEY=<clave> ./scripts/start-reasoner.sh
+```
+
+El script espera hasta que ups-reasoner esté listo (~5-15 min) y lo registra en LiteLLM automáticamente.
+
+**Restaurar modo normal** (detiene ups-reasoner, levanta ups-main):
+
+```bash
+./scripts/stop-reasoner.sh
+```
+
+**Activar modelo premium ups-pro** (72B AWQ, requiere detener otros modelos):
+
+```bash
+LITELLM_MASTER_KEY=<clave> ./scripts/start-premium-model.sh
+```
+
+**Tabla de modos de operación:**
+
+| Modo | Activos | Memoria aprox. | Comando |
+|------|---------|----------------|---------|
+| Normal (defecto) | ups-fast + ups-main | ~37 GB | `docker compose up -d` |
+| Razonador | ups-fast + ups-reasoner | ~92 GB | `scripts/start-reasoner.sh` |
+| Premium | ups-fast + ups-pro | ~57 GB | `scripts/start-premium-model.sh` |
+
 ---
 
 ## Referencia rápida de comandos
 
 ```bash
-# Levantar todo
+# Levantar todo (modo normal: ups-fast + ups-main)
 docker compose up -d
 
 # Detener todo
@@ -402,15 +510,21 @@ docker ps
 # Logs
 docker logs ups-litellm -f
 docker logs ups-fast -f
+docker logs ups-main -f
 
 # Reiniciar un servicio
 docker compose restart litellm
 
+# Modo razonador (ups-fast + ups-reasoner, detiene ups-main)
+LITELLM_MASTER_KEY=<clave> ./scripts/start-reasoner.sh
+./scripts/stop-reasoner.sh          # volver al modo normal
+
 # Activar modelo premium
 LITELLM_MASTER_KEY=<clave> ./scripts/start-premium-model.sh
 
-# Desactivar modelo premium
-./scripts/stop-premium-model.sh
+# Detener un modelo específico sin bajar todo
+docker compose stop ups-main
+docker compose up -d ups-main       # volver a levantar
 ```
 
 ---
@@ -423,6 +537,9 @@ LITELLM_MASTER_KEY=<clave> ./scripts/start-premium-model.sh
 | `Error: no such runtime: nvidia` | Toolkit no configurado | Repetir Paso 3 |
 | `CUDA: False` en test vLLM | Driver/toolkit desincronizados | `sudo reboot` |
 | LiteLLM en 502 al arrancar | Aún corriendo migraciones | Esperar 30-60s |
-| vLLM `OOM` al cargar modelo | VRAM insuficiente | Reducir `--max-model-len` a `16384` |
+| vLLM `OOM` — `Free memory X/121.69 GiB` | `gpu_memory_utilization` muy alto | Ya configurado por modelo en `docker-compose.yml`; si persiste, reducir el valor |
+| ups-main en crash loop junto a ups-reasoner | 3 modelos BF16 no caben en 121 GB | Usar `scripts/start-reasoner.sh` (detiene ups-main automáticamente) |
 | vLLM `created` pero no `healthy` | Modelo cargando (normal) | Esperar 5-15 min |
+| nginx `unhealthy` en Alpine | `localhost` resuelve a `::1` (IPv6) | Ya corregido: healthcheck usa `127.0.0.1` |
+| Chat `/ui/chat` no responde | API key no configurada en UI | Ver Paso 5.8.1 — engranaje ⚙️ en `/ui/chat` |
 | `curl /health` → 401 | nginx sin actualizar | `docker compose restart nginx` |
