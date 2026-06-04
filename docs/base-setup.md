@@ -15,7 +15,7 @@ Sin él, ningún proceso puede acceder al hardware de cómputo.
 ### 1.1 Verificar versión del sistema operativo
 
 ```bash
-lsb_release -a
+lsb_release -a 
 ```
 
 **Salida esperada del equipo:**
