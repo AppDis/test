@@ -119,7 +119,9 @@ services:
       - "--port"
       - "8000"
       - "--max-model-len"
-      - "32768"
+      - "16384"
+      - "--gpu-memory-utilization"
+      - "0.13"
       - "--enable-chunked-prefill"
     expose:
       - "8000"
@@ -164,7 +166,9 @@ services:
       - "--quantization"
       - "awq"
       - "--max-model-len"
-      - "32768"
+      - "16384"
+      - "--gpu-memory-utilization"
+      - "0.18"
       - "--enable-chunked-prefill"
     expose:
       - "8000"
@@ -207,7 +211,9 @@ services:
       - "--port"
       - "8000"
       - "--max-model-len"
-      - "32768"
+      - "8192"
+      - "--gpu-memory-utilization"
+      - "0.55"
       - "--enable-chunked-prefill"
     expose:
       - "8000"
