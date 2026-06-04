@@ -119,7 +119,7 @@ services:
       - "--port"
       - "8000"
       - "--max-model-len"
-      - "16384"
+      - "32768"
       - "--gpu-memory-utilization"
       - "0.15"
       - "--enable-chunked-prefill"
