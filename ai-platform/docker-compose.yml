@@ -166,9 +166,9 @@ services:
       - "--quantization"
       - "awq"
       - "--max-model-len"
-      - "16384"
+      - "32768"
       - "--gpu-memory-utilization"
-      - "0.18"
+      - "0.25"
       - "--enable-chunked-prefill"
     expose:
       - "8000"
@@ -184,7 +184,10 @@ services:
       retries: 10
       start_period: 180s
 
-  # ─── Modelo razonador ─────────────────────────────────────────────────────
+  # ─── Modelo razonador (bajo demanda) ─────────────────────────────────────
+  # No arranca por defecto — requiere detener ups-main primero (memoria insuficiente
+  # para correr los 3 modelos BF16 simultáneamente en 121 GB).
+  # Activar con: scripts/start-reasoner.sh
   ups-reasoner:
     image: vllm/vllm-openai:latest-aarch64-cu129-ubuntu2404
     container_name: ups-reasoner
@@ -221,6 +224,8 @@ services:
       - "127.0.0.1:8003:8000"
     networks:
       - ups-internal
+    profiles:
+      - reasoning
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/health"]
