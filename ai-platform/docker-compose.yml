@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Equipo: NVIDIA GB10 (Grace Blackwell) · Ubuntu 24.04 · ARM64 (aarch64)
 # vLLM usa imagen ARM64 específica: vllm/vllm-openai:latest-aarch64-cu129-ubuntu2404
 # LiteLLM en ghcr.io soporta multi-arch (ARM64 incluido).
