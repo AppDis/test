@@ -9,8 +9,29 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  jupyter_home:
 
 services:
+
+  # ─── JupyterHub ──────────────────────────────────────────────────────────
+  jupyter:
+    build:
+      context: ./jupyter
+    container_name: ups-jupyter
+    volumes:
+      - ./jupyter/jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro
+      - jupyter_home:/home
+    expose:
+      - "8000"
+    networks:
+      - ups-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/jupyter/hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ─── Reverse Proxy ────────────────────────────────────────────────────────
   nginx:
@@ -22,6 +43,7 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - litellm
+      - jupyter
     networks:
       - ups-internal
     restart: unless-stopped
