@@ -40,19 +40,28 @@ nano .env
 
 Ver `models/README.md` para instrucciones de descarga con `huggingface-cli`.
 
-### 3. Certificados TLS
+### 3. Exposición pública con Cloudflare Tunnel
 
-```bash
-mkdir -p nginx/certs
-# Opción A: Let's Encrypt (requiere dominio público)
-certbot certonly --standalone -d ia-computacion.example.edu.ec
-cp /etc/letsencrypt/live/ia-computacion.example.edu.ec/fullchain.pem nginx/certs/
-cp /etc/letsencrypt/live/ia-computacion.example.edu.ec/privkey.pem   nginx/certs/
+No se necesita certificado TLS local, ni abrir puertos 80/443, ni coordinar
+firewall con el Departamento de Sistemas: `nginx` no publica ningún puerto en
+el host, y el contenedor `cloudflared` lo expone a Internet mediante un túnel
+saliente. Cloudflare termina el TLS público.
 
-# Opción B: Certificado proporcionado por el Departamento de Sistemas
-cp /ruta/al/cert/fullchain.pem nginx/certs/
-cp /ruta/al/cert/privkey.pem   nginx/certs/
-```
+1. En el [dashboard de Cloudflare Zero Trust](https://one.dash.cloudflare.com/)
+   (requiere el dominio ya administrado por Cloudflare):
+   `Networks → Tunnels → Create a tunnel → Cloudflared → Docker`.
+2. Copia el token que te da el asistente (empieza con `eyJ...`) y ponlo en `.env`:
+   ```
+   CLOUDFLARE_TUNNEL_TOKEN=eyJ...
+   ```
+3. En la pestaña **Public Hostname** del túnel, agrega una ruta:
+   - Subdomain: `ia-computacion` (o el que asigne Sistemas)
+   - Domain: tu dominio institucional en Cloudflare
+   - Service: `HTTP` → `nginx:80`
+4. (Opcional) Si quieres restringir el panel `/ui` a cuentas autorizadas
+   además del login de LiteLLM, crea una **Cloudflare Access Application**
+   apuntando al mismo hostname + path `/ui*`, con política de email/dominio
+   institucional.
 
 ### 4. Levantar la plataforma
 
@@ -216,11 +225,10 @@ watch -n 2 nvidia-smi
 
 ## Coordinación con Departamento de Sistemas
 
-Requerimientos para publicación:
+Con Cloudflare Tunnel ya no es necesario abrir puertos ni gestionar
+certificados: el túnel sale desde el contenedor `cloudflared` y no requiere
+ninguna regla de firewall entrante. Requerimientos para publicación:
 
-- Subdominio institucional asignado
-- Configuración DNS
-- Apertura de puertos 80 y 443
-- Certificado TLS institucional
-- Reglas de firewall
-- Revisión de seguridad perimetral
+- Subdominio institucional gestionado en Cloudflare (DNS ya delegado/proxied)
+- Token del túnel (`CLOUDFLARE_TUNNEL_TOKEN`) generado en Zero Trust
+- Revisión de seguridad perimetral / política de acceso (opcional: Cloudflare Access sobre `/ui`)

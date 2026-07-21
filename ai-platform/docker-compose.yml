@@ -34,11 +34,14 @@ services:
       start_period: 30s
 
   # ─── Reverse Proxy ────────────────────────────────────────────────────────
+  # Sin "ports:" — no expone nada en el host. Solo accesible dentro de
+  # ups-internal (por litellm no directamente, y por cloudflared para
+  # publicarlo a Internet vía Cloudflare Tunnel, sin abrir puertos 80/443).
   nginx:
     image: nginx:alpine
     container_name: ups-nginx
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -52,6 +55,23 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  # ─── Cloudflare Tunnel ────────────────────────────────────────────────────
+  # Publica nginx a Internet sin abrir puertos entrantes ni coordinar
+  # firewall con el Departamento de Sistemas. El túnel se configura en el
+  # dashboard de Cloudflare Zero Trust (Networks > Tunnels); ahí se define
+  # el hostname público y la ruta interna http://nginx:80.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ups-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    networks:
+      - ups-internal
+    restart: unless-stopped
 
   # ─── LiteLLM Gateway ──────────────────────────────────────────────────────
   litellm:
