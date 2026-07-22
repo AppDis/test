@@ -57,16 +57,20 @@ services:
       retries: 3
 
   # ─── Cloudflare Tunnel ────────────────────────────────────────────────────
-  # Publica nginx a Internet sin abrir puertos entrantes ni coordinar
-  # firewall con el Departamento de Sistemas. El túnel se configura en el
-  # dashboard de Cloudflare Zero Trust (Networks > Tunnels); ahí se define
-  # el hostname público y la ruta interna http://nginx:80.
+  # Publica nginx (y opcionalmente SSH del host) a Internet sin abrir puertos
+  # entrantes ni coordinar firewall con el Departamento de Sistemas. Las rutas
+  # (hostname -> servicio) se configuran en el dashboard de Cloudflare Zero
+  # Trust (Networks > Tunnels), no aquí. `extra_hosts` permite que este
+  # contenedor alcance el sshd real del host (fuera de Docker) a través de
+  # host.docker.internal, para poder enrutar una hostname route tipo SSH.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: ups-cloudflared
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - nginx
     networks:
